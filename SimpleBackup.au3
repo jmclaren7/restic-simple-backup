@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.170
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.171
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -27,7 +27,6 @@
 #include <GuiEdit.au3>
 #include <WindowsConstants.au3>
 
-
 ; https://github.com/jmclaren7/AutoITScripts/blob/master/CommonFunctions.au3
 #include <CommonFunctions.au3>
 
@@ -36,10 +35,9 @@ Global $LogToFile = 1
 Global $LogFileMaxSize = 512
 Global $LogLevel = 3
 
+; Setup some globals for general use
 Global $Title = StringTrimRight(@ScriptName, 4)
 _ConsoleWrite("Starting " & $Title)
-
-
 Global $TempDir = _TempFile (@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
@@ -60,13 +58,11 @@ If FileInstall("restic64.exe", $ResticFullPath, 1) = 0 Then
 	Exit
 Endif
 
-; Register our exit function
+; Register our exit function for cleanup
 OnAutoItExitRegister("_Exit")
 
 ; Load data from config and load to variables
 _ReadConfig()
-
-Global $SetupPassword = Eval($Value_Prefix & "Setup_Password")
 
 ; Interpret command line parameters
 If $CmdLine[0] >= 1 Then
@@ -147,6 +143,7 @@ Switch $Command
 						$RunSTDIO = $STDERR_MERGED
 					EndIf
 
+				; Save or save and close
 				Case $ApplyButton, $OKButton
 					$GuiData = GUICtrlRead($ScriptEdit)
 					_ConfigRawToMemory($GuiData)
@@ -156,13 +153,16 @@ Switch $Command
 
 					_UpdateCommandComboBox()
 
+				; Close program
 				Case $GUI_EVENT_CLOSE, $CancelButton
+					; Exit and run the registered exit function for cleanup
 					Exit
 
+				; Run the provided command
 				Case $RunButton
+					;
 					GUISetState(@SW_DISABLE, $SettingsForm)
 					WinSetTrans($SettingsForm, "", 180)
-
 
 					; Don't continue if combo box is on the placeholder text
 					If _GUICtrlComboBox_GetCurSel($RunCombo) = 0 Then ContinueLoop
@@ -240,7 +240,7 @@ Func _Auth()
 
 	While 1
 		; Check input first to deal with empty password
-		If $InputPass = $SetupPassword Then ExitLoop
+		If $InputPass = Eval($Value_Prefix & "Setup_Password") Then ExitLoop
 
 		$InputPass = InputBox($Title, "Enter Password", "", "*", Default, 130)
 		If @error Then Exit
@@ -252,6 +252,8 @@ EndFunc
 
 ; Updates the options in the GUI combo box
 Func _UpdateCommandComboBox()
+	_ConsoleWrite("_UpdateCommandComboBox", 3)
+
 	_GUICtrlComboBox_ResetContent ( $RunCombo )
 
 	$Opts = "Select or type a command"
@@ -263,8 +265,9 @@ Func _UpdateCommandComboBox()
 	$Opts &= "|" & "snapshots  (Lists snapshots in the repository)"
 	$Opts &= "|" & "unlock  (Unlocks the repository in case restic had an issue)"
 	$Opts &= "|" & "check --read-data  (Verifies all data in repo SLOW!!!)"
-	$Opts &= "|" & "--help  (Show restic help information)"
+	$Opts &= "|" & "stats raw-data  (Show storage used)"
 	$Opts &= "|" & "version  (Show restic version information)"
+	$Opts &= "|" & "--help  (Show restic help information)"
 	GUICtrlSetData($RunCombo, $Opts, "Select or type a command")
 
 EndFunc
@@ -298,13 +301,14 @@ Func _ClearEnv()
 EndFunc
 
 ; Convert a tring of key=value pairs into internal variables
-Func _ConfigRawToMemory($RawData)
+Func _ConfigRawToMemory($ConfigData)
 	_ConsoleWrite("_ConfigRawToMemory", 3)
-	$RawData = StringSplit($RawData, @CRLF)
 
-	For $o=1 To $RawData[0]
-		$Key = StringLeft($RawData[$o], StringInStr($RawData[$o], "=") - 1)
-		$KeyValue = StringTrimLeft($RawData[$o], StringInStr($RawData[$o], "="))
+	$ConfigData = StringSplit($ConfigData, @CRLF)
+
+	For $o=1 To $ConfigData[0]
+		$Key = StringLeft($ConfigData[$o], StringInStr($ConfigData[$o], "=") - 1)
+		$KeyValue = StringTrimLeft($ConfigData[$o], StringInStr($ConfigData[$o], "="))
 
 		Assign($Value_Prefix & $Key, $KeyValue, $ASSIGN_FORCEGLOBAL)
 	Next
@@ -315,7 +319,7 @@ EndFunc
 Func _MemoryToConfigRaw()
 	_ConsoleWrite("_MemoryToConfigRaw", 3)
 
-	Local $ConfigRaw
+	Local $ConfigData
 
 	$aValues = StringSplit($ValidValues, "|")
 
@@ -323,31 +327,31 @@ Func _MemoryToConfigRaw()
 		$Key = $aValues[$o]
 		$KeyData = Eval($Value_Prefix & $aValues[$o])
 
-		$ConfigRaw &= $Key & "=" & $KeyData & @CRLF
+		$ConfigData &= $Key & "=" & $KeyData & @CRLF
 	Next
 
-	Return $ConfigRaw
+	Return $ConfigData
 EndFunc
 
 ; Read and decrypt the config file then load it to internal variables
 Func _ReadConfig()
 	_ConsoleWrite("_ReadConfig", 3)
 
-	$FileData = FileRead($ConfigFileFullPath)
+	Local $ConfigData = FileRead($ConfigFileFullPath)
 
 	; Decypt Data Here
-	$FileData = BinaryToString(_Crypt_DecryptData($FileData, $HwKey, $CALG_AES_256))
+	$ConfigData = BinaryToString(_Crypt_DecryptData($ConfigData, $HwKey, $CALG_AES_256))
 
-	_ConfigRawToMemory($FileData)
+	_ConfigRawToMemory($ConfigData)
 
-	Return $FileData
+	Return $ConfigData
 EndFunc
 
 ; Convert internal variables to string, encrypt and write the config file
 Func _WriteConfig()
 	_ConsoleWrite("_WriteConfig", 3)
 
-	$ConfigData = _MemoryToConfigRaw()
+	Local $ConfigData = _MemoryToConfigRaw()
 
 	; Encrypt
 	$ConfigData = _Crypt_EncryptData($ConfigData, $HwKey, $CALG_AES_256)
@@ -361,13 +365,15 @@ EndFunc
 ; Execute a restic command
 Func _Restic($Command, $Opt = $RunSTDIO)
 	_ConsoleWrite("_Restic", 3)
+
 	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
+
 	If $Hash <> $ResticHash Then
 		_ConsoleWrite("Hash error - " & $Hash)
 		Exit
 	EndIf
 
-	$Run = $ResticFullPath & " " & $Command
+	Local $Run = $ResticFullPath & " " & $Command
 
 	_ConsoleWrite("Command: " & $Run, 3)
 	_UpdateEnv()
@@ -379,11 +385,13 @@ EndFunc
 Func _Exit()
 	_ConsoleWrite("_Exit", 3)
 
+	; Close any instance of restic-browser
 	ProcessClose($ResticBrowserPid)
 	ProcessClose("Restic-Browser.exe")
 
-	$sPath = @TempDir & "\"
-	$aList = _FileListToArray($sPath, "sbr*.tmp", 2)
+	; Delete any temp folders we ever created
+	Local $sPath = @TempDir & "\"
+	Local $aList = _FileListToArray($sPath, "sbr*.tmp", 2)
 	For $i = 1 To $aList[0]
 		$RemovePath = $sPath & $aList[$i]
 		DirRemove($RemovePath, 1)
