@@ -386,7 +386,7 @@ Func _Exit()
 	_ConsoleWrite("_Exit", 3)
 
 	; Close any instance of restic-browser
-	ProcessClose($ResticBrowserPid)
+	If IsDeclared("ResticBrowserPid") Then ProcessClose($ResticBrowserPid)
 	ProcessClose("Restic-Browser.exe")
 
 	; Delete any temp folders we ever created
