@@ -160,9 +160,10 @@ Switch $Command
 
 				; Run the provided command
 				Case $RunButton
-					;
+					; Adjust window visibility and activation due to long running process
 					GUISetState(@SW_DISABLE, $SettingsForm)
 					WinSetTrans($SettingsForm, "", 180)
+					If @Compiled Then WinActivate("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]")
 
 					; Don't continue if combo box is on the placeholder text
 					If _GUICtrlComboBox_GetCurSel($RunCombo) = 0 Then ContinueLoop
