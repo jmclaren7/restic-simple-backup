@@ -1,5 +1,7 @@
 # Restic SimpleBackup
 This AutoIT script helps with the deployment, configuration and operation of Restic backup and Restic-Browser
+
+### Setup
 1. Copy SimpleBackup.exe to your system, making a folder if desired. You Can also rename SimpleBackup.exe to whatever you prefer. eg: C:\Program Files\AcmeSimpleBackup\AcmeSimpleBackup.exe
 2. Run SimpleBackup.exe and configured the backup path, bucket info and Restic password. (For B2, use the AWS variables)
 3. Hit apply to save the configuration
@@ -8,7 +10,7 @@ This AutoIT script helps with the deployment, configuration and operation of Res
 6. From the tools menu, open Restic Browser to explore and test your backup
 
 
-B2 Ransomware
+### B2 Ransomware Resistance
 To add resistance to ransomware you'll need to use the b2 cli so you can specify exact permissions, b2.exe can be downloaded from their GitHub
 
 1. Command Example:
