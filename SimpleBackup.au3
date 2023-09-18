@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.189
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.196
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -38,8 +38,11 @@ Global $LogFileMaxSize = 512
 Global $LogLevel = 1
 
 ; Setup some globals for general use
+Global $Version = 0
+If @Compiled Then $Version = FileGetVersion(@AutoItExe)
 Global $Title = StringTrimRight(@ScriptName, 4)
-_ConsoleWrite("Starting " & $Title)
+Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Version,".", 0, -1))
+_ConsoleWrite("Starting " & $TitleVersion)
 Global $TempDir = _TempFile (@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
@@ -127,7 +130,7 @@ Switch $Command
 
 		; Set some of the GUI parameters that we don't or can't do in Koda
 		;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
-		WinSetTitle($SettingsForm, "", $Title) ; Set the title from title variable
+		WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
 		GUICtrlSetData($ScriptEdit, _MemoryToConfigRaw()) ; Load the edit box with config data
 		_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
 		_UpdateCommandComboBox() ; Set the options in the combobox
@@ -138,7 +141,7 @@ Switch $Command
 		$g_hFile = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hFile, 0, "Exit", $ExitMenuItem)
 		$g_hTools = _GUICtrlMenu_CreateMenu()
-		_GUICtrlMenu_InsertMenuItem($g_hTools, 0, "Create Scheduled Task For Backup", $ScheduledTaskMenuItem)
+		_GUICtrlMenu_InsertMenuItem($g_hTools, 0, "Create/Reset Scheduled Task", $ScheduledTaskMenuItem)
 		_GUICtrlMenu_InsertMenuItem($g_hTools, 1, "Open Restic Browser", $BrowserMenuItem)
 		$g_hAdvanced = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 0, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
@@ -218,8 +221,13 @@ Switch $Command
 				Case $ScheduledTaskMenuItem
 					$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
 					_ConsoleWrite($Run)
-					_ConsoleWrite("")
-					_RunWait($Run, @ScriptDir, @SW_SHOW, $RunSTDIO, True)
+					$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
+					If StringInStr($Return, "SUCCESS: ") Then
+						MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
+					Else
+						MsgBox($MB_ICONERROR, $TitleVersion, "Error creating scheduled task.")
+					EndIf
+
 
 				; Run the command provided from the combobox
 				Case $RunButton
@@ -286,7 +294,7 @@ Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 		;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
 
 		If $Temp >= 1000 And $Temp < 1100 Then
-			_ConsoleWrite("Updated $MenuMsg To " & $Temp)
+			_ConsoleWrite("Updated $MenuMsg To " & $Temp, 3)
 			Global $MenuMsg = $Temp
 		EndIf
 
@@ -303,7 +311,7 @@ Func _Auth()
 		; Check input first to deal with empty password
 		If $InputPass = Eval($Value_Prefix & "Setup_Password") Then ExitLoop
 
-		$InputPass = InputBox($Title, "Enter Password", "", "*", Default, 130)
+		$InputPass = InputBox($TitleVersion, "Enter Password", "", "*", Default, 130)
 		If @error Then Exit
 
 	Wend
