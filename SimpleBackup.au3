@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.186
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.189
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -151,6 +151,7 @@ Switch $Command
 		_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
 
 		_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False)
+		If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 		GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
 
@@ -282,10 +283,10 @@ EndSwitch
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 		Local $Temp = _WinAPI_LoWord($wParam)
 
-		_ConsoleWrite("_WM_COMMAND ($Temp = " & $Temp & ") " & $GUI_RUNDEFMSG, 3)
+		;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
 
 		If $Temp >= 1000 And $Temp < 1100 Then
-			_ConsoleWrite("Update $MenuMsg")
+			_ConsoleWrite("Updated $MenuMsg To " & $Temp)
 			Global $MenuMsg = $Temp
 		EndIf
 
@@ -456,7 +457,9 @@ Func _Exit()
 	For $i = 1 To $aList[0]
 		$RemovePath = $sPath & $aList[$i]
 		DirRemove($RemovePath, 1)
-		_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")")
+		_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")", 3)
 	Next
+
+	_ConsoleWrite("Cleanup Done, Exiting Program")
 EndFunc
 
