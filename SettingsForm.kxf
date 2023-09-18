@@ -3,8 +3,8 @@
 	<properties>
 		<property name="Left" vt="Int16">1057</property>
 		<property name="Top" vt="Int16">387</property>
-		<property name="Width" vt="Int16">522</property>
-		<property name="Height" vt="Int16">448</property>
+		<property name="Width" vt="Int16">616</property>
+		<property name="Height" vt="Int16">489</property>
 		<property name="Caption" vt="String">Title</property>
 		<property name="Color" vt="Ident">clBtnFace</property>
 		<property name="Font.Charset" vt="Ident">DEFAULT_CHARSET</property>
@@ -33,8 +33,8 @@
 	<components>
 		<object type="TAButton" name="ApplyButton">
 			<properties>
-				<property name="Left" vt="Int16">422</property>
-				<property name="Top" vt="Int16">376</property>
+				<property name="Left" vt="Int16">510</property>
+				<property name="Top" vt="Int16">416</property>
 				<property name="Width" vt="Int8">75</property>
 				<property name="Height" vt="Int8">25</property>
 				<property name="Caption" vt="String">Apply</property>
@@ -50,8 +50,8 @@
 			<properties>
 				<property name="Left" vt="Int8">7</property>
 				<property name="Top" vt="Int8">3</property>
-				<property name="Width" vt="Int16">489</property>
-				<property name="Height" vt="Int16">321</property>
+				<property name="Width" vt="Int16">585</property>
+				<property name="Height" vt="Int16">361</property>
 				<property name="Font.Charset" vt="Ident">DEFAULT_CHARSET</property>
 				<property name="Font.Color" vt="Ident">clWindowText</property>
 				<property name="Font.Height" vt="Int8">-13</property>
@@ -72,8 +72,8 @@
 		</object>
 		<object type="TAButton" name="CancelButton">
 			<properties>
-				<property name="Left" vt="Int16">337</property>
-				<property name="Top" vt="Int16">376</property>
+				<property name="Left" vt="Int16">425</property>
+				<property name="Top" vt="Int16">416</property>
 				<property name="Width" vt="Int8">75</property>
 				<property name="Height" vt="Int8">25</property>
 				<property name="Caption" vt="String">Cancel</property>
@@ -87,8 +87,8 @@
 		</object>
 		<object type="TAButton" name="OKButton">
 			<properties>
-				<property name="Left" vt="Int16">251</property>
-				<property name="Top" vt="Int16">376</property>
+				<property name="Left" vt="Int16">339</property>
+				<property name="Top" vt="Int16">416</property>
 				<property name="Width" vt="Int8">75</property>
 				<property name="Height" vt="Int8">25</property>
 				<property name="Caption" vt="String">OK</property>
@@ -102,8 +102,8 @@
 		</object>
 		<object type="TAButton" name="RunButton">
 			<properties>
-				<property name="Left" vt="Int16">444</property>
-				<property name="Top" vt="Int16">332</property>
+				<property name="Left" vt="Int16">532</property>
+				<property name="Top" vt="Int16">376</property>
 				<property name="Width" vt="Int8">51</property>
 				<property name="Height" vt="Int8">33</property>
 				<property name="Caption" vt="String">Run</property>
@@ -118,8 +118,8 @@
 		<object type="TACombo" name="RunCombo">
 			<properties>
 				<property name="Left" vt="Int8">15</property>
-				<property name="Top" vt="Int16">338</property>
-				<property name="Width" vt="Int16">417</property>
+				<property name="Top" vt="Int16">382</property>
+				<property name="Width" vt="Int16">505</property>
 				<property name="Height" vt="Int8">25</property>
 				<property name="Font.Charset" vt="Ident">ANSI_CHARSET</property>
 				<property name="Font.Color" vt="Ident">clWindowText</property>
@@ -133,20 +133,6 @@
 				<property name="CtrlStyle" vt="Int32">1342374466</property>
 				<property name="CtrlExStyle" vt="Int8">0</property>
 				<property name="Resizing" vt="Set">DockLeft, DockRight, DockBottom, DockHeight</property>
-			</properties>
-			<components/>
-		</object>
-		<object type="TACheckbox" name="STDIOCheckBox">
-			<properties>
-				<property name="Left" vt="Int8">16</property>
-				<property name="Top" vt="Int16">368</property>
-				<property name="Width" vt="Int16">225</property>
-				<property name="Height" vt="Int8">17</property>
-				<property name="Caption" vt="String">Show More Output (Limits file log)</property>
-				<property name="TabOrder" vt="Int8">6</property>
-				<property name="CtrlStyle" vt="Int32">1342242819</property>
-				<property name="CtrlExStyle" vt="Int8">0</property>
-				<property name="Resizing" vt="Set">DockHeight</property>
 			</properties>
 			<components/>
 		</object>

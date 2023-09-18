@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.171
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.185
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -22,9 +22,11 @@
 #include <AutoItConstants.au3>
 #include <Crypt.au3>
 #include <WinAPIDiag.au3>
+#include <WinAPIConv.au3>
 #include <GUIConstantsEx.au3>
 #include <GuiComboBox.au3>
 #include <GuiEdit.au3>
+#include <GuiMenu.au3>
 #include <WindowsConstants.au3>
 
 ; https://github.com/jmclaren7/AutoITScripts/blob/master/CommonFunctions.au3
@@ -33,7 +35,7 @@
 ; Setup Logging For _ConsoleWrite
 Global $LogToFile = 1
 Global $LogFileMaxSize = 512
-Global $LogLevel = 3
+Global $LogLevel = 1
 
 ; Setup some globals for general use
 Global $Title = StringTrimRight(@ScriptName, 4)
@@ -97,52 +99,72 @@ Switch $Command
 
 	; Setup GUI
 	Case "setup"
+		WinMove("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]", "", 4, 4)
+
 		_Auth()
 
 		Global $SettingsForm, $RunCombo
 
 		#Region ### START Koda GUI section ###
-		$SettingsForm = GUICreate("Title", 507, 410, -1, -1, BitOR($GUI_SS_DEFAULT_GUI,$WS_SIZEBOX,$WS_THICKFRAME))
-		$ApplyButton = GUICtrlCreateButton("Apply", 422, 376, 75, 25)
+		$SettingsForm = GUICreate("Title", 601, 451, -1, -1, BitOR($GUI_SS_DEFAULT_GUI,$WS_SIZEBOX,$WS_THICKFRAME))
+		$ApplyButton = GUICtrlCreateButton("Apply", 510, 416, 75, 25)
 		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 489, 321, BitOR($GUI_SS_DEFAULT_EDIT,$WS_BORDER), 0)
+		$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 585, 361, BitOR($GUI_SS_DEFAULT_EDIT,$WS_BORDER), 0)
 		GUICtrlSetData(-1, "")
 		GUICtrlSetFont(-1, 10, 400, 0, "Consolas")
 		GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKTOP+$GUI_DOCKBOTTOM)
-		$CancelButton = GUICtrlCreateButton("Cancel", 337, 376, 75, 25)
+		$CancelButton = GUICtrlCreateButton("Cancel", 425, 416, 75, 25)
 		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$OKButton = GUICtrlCreateButton("OK", 251, 376, 75, 25)
+		$OKButton = GUICtrlCreateButton("OK", 339, 416, 75, 25)
 		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$RunButton = GUICtrlCreateButton("Run", 444, 332, 51, 33)
+		$RunButton = GUICtrlCreateButton("Run", 532, 376, 51, 33)
 		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 338, 417, 25, BitOR($CBS_DROPDOWN,$CBS_AUTOHSCROLL))
+		$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 382, 505, 25, BitOR($CBS_DROPDOWN,$CBS_AUTOHSCROLL))
 		GUICtrlSetFont(-1, 9, 400, 0, "Consolas")
 		GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKHEIGHT)
-		$STDIOCheckBox = GUICtrlCreateCheckbox("Show More Output (Limits file log)", 16, 368, 225, 17)
 		GUISetState(@SW_SHOW)
 		#EndRegion ### END Koda GUI section ###
 
-		; Set some of the GUI parameters so we don't have to do it directly in the form code
-		WinSetTitle($SettingsForm, "", $Title)
-		GUICtrlSetData($ScriptEdit, _MemoryToConfigRaw())
-		_GUICtrlComboBox_SetDroppedWidth ( $RunCombo, 600)
-		_UpdateCommandComboBox()
-		GUICtrlSetState($STDIOCheckBox, $GUI_CHECKED)
+		; Set some of the GUI parameters that we don't or can't do in Koda
+		;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
+		WinSetTitle($SettingsForm, "", $Title) ; Set the title from title variable
+		GUICtrlSetData($ScriptEdit, _MemoryToConfigRaw()) ; Load the edit box with config data
+		_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
+		_UpdateCommandComboBox() ; Set the options in the combobox
+
+		Global $MenuMsg = 0
+		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem
+		; Create menus
+		$g_hFile = _GUICtrlMenu_CreateMenu()
+		_GUICtrlMenu_InsertMenuItem($g_hFile, 0, "Exit", $ExitMenuItem)
+		$g_hTools = _GUICtrlMenu_CreateMenu()
+		_GUICtrlMenu_InsertMenuItem($g_hTools, 0, "Create Scheduled Task For Backup", $ScheduledTaskMenuItem)
+		_GUICtrlMenu_InsertMenuItem($g_hTools, 1, "Open Restic Browser", $BrowserMenuItem)
+		$g_hAdvanced = _GUICtrlMenu_CreateMenu()
+		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 0, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
+		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
+		; Create Main menu
+		$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS)) ; ..for MNS_MODELESS, only this "main menu" is needed.
+		_GUICtrlMenu_InsertMenuItem($g_hMain, 0, "&File", 0, $g_hFile)
+		_GUICtrlMenu_InsertMenuItem($g_hMain, 1, "&Tools", 0, $g_hTools)
+		_GUICtrlMenu_InsertMenuItem($g_hMain, 2, "&Advanced", 0, $g_hAdvanced)
+		_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
+
+		_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False)
+		GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
 
 		While 1
-			; Continue based on GUI action
 			$nMsg = GUIGetMsg()
-			Switch $nMsg
-				; Adjust the global used to determine STDIO streams for child processes
-				Case $STDIOCheckBox
- 					_ConsoleWrite("$STDIOCheckBox")
-					If GUICtrlRead($STDIOCheckBox) = $GUI_CHECKED Then
-						$RunSTDIO = $STDIO_INHERIT_PARENT
-					Else
-						$RunSTDIO = $STDERR_MERGED
-					EndIf
+			; Add menu actions from custom menu gui
+			If $nMsg = 0 And $MenuMsg <> 0 Then
+				$nMsg = $MenuMsg
+				$MenuMsg = 0
+			Endif
+			If $nMsg <> 0 And $nMsg <> -11 Then _ConsoleWrite("Merged $nMsg = "&$nMsg, 3)
 
+			; Continue based on GUI action
+			Switch $nMsg
 				; Save or save and close
 				Case $ApplyButton, $OKButton
 					$GuiData = GUICtrlRead($ScriptEdit)
@@ -154,11 +176,51 @@ Switch $Command
 					_UpdateCommandComboBox()
 
 				; Close program
-				Case $GUI_EVENT_CLOSE, $CancelButton
+				Case $GUI_EVENT_CLOSE, $CancelButton, $ExitMenuItem
 					; Exit and run the registered exit function for cleanup
 					Exit
 
-				; Run the provided command
+				; Handle menu items that use checkboxes
+				Case $FixConsoleMenuItem, $VerboseMenuItem
+					If  _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
+						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , False, False)
+					Else
+						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
+					EndIf
+
+				Case $BrowserMenuItem
+					; Pack and unpack the restic-browser executable
+					DirCreate($TempDir)
+					If FileInstall("Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
+						_ConsoleWrite("FileInstall error")
+						Exit
+					Endif
+
+					; Update PATH env so that restic-browser.exe can start restic.exe
+					$EnvPath = EnvGet("Path")
+					If Not StringInStr($EnvPath, $TempDir) Then
+						EnvSet("Path", $TempDir & ";" & $EnvPath)
+						_ConsoleWrite("EnvSet: "&@error)
+					EndIf
+
+					; Verify the hash of the restic-browser.exe
+					Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
+					If $Hash <> $ResticBrowserHash Then
+						_ConsoleWrite("Hash error - " & $Hash)
+						Exit
+					EndIf
+
+					; Load the restic credential envs and start restic-browser.exe
+					_UpdateEnv()
+					$ResticBrowserPid = Run($ResticBrowserFullPath)
+
+				Case $ScheduledTaskMenuItem
+					$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
+					_ConsoleWrite($Run)
+					_ConsoleWrite("")
+					_RunWait($Run, @ScriptDir, @SW_SHOW, $RunSTDIO, True)
+
+				; Run the command provided from the combobox
 				Case $RunButton
 					; Adjust window visibility and activation due to long running process
 					GUISetState(@SW_DISABLE, $SettingsForm)
@@ -171,43 +233,27 @@ Switch $Command
 					; Continue based on combobox value
 					$RunComboText = GUICtrlRead($RunCombo)
 					Switch $RunComboText
-						Case "Create Scheduled Task"
-							$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
-							_ConsoleWrite($Run)
-							_ConsoleWrite("")
-							_RunWait($Run, @ScriptDir, @SW_SHOW, $RunSTDIO, True)
-
-						Case "Restic Browser"
-							; Pack and unpack the restic-browser executable
-							DirCreate($TempDir)
-							If FileInstall("Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
-								_ConsoleWrite("FileInstall error")
-								Exit
-							Endif
-
-							; Update PATH env so that restic-browser.exe can start restic.exe
-							$EnvPath = EnvGet("Path")
-							If Not StringInStr($EnvPath, $TempDir) Then
-								EnvSet("Path", $TempDir & ";" & $EnvPath)
-								_ConsoleWrite("EnvSet: "&@error)
-							EndIf
-
-							; Verify the hash of the restic-browser.exe
-							Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
-							If $Hash <> $ResticBrowserHash Then
-								_ConsoleWrite("Hash error - " & $Hash)
-								Exit
-							EndIf
-
-							; Load the restic credential envs and start restic-browser.exe
-							_UpdateEnv()
-							$ResticBrowserPid = Run($ResticBrowserFullPath)
+						Case "place holder"
 
 						Case Else
 							_Restic($RunComboText)
 
 					EndSwitch
 			EndSwitch
+
+			; Adjust $LogLevel
+			If _GUICtrlMenu_GetItemChecked($g_hMain, $VerboseMenuItem, False) Then
+				$LogLevel = 3
+			Else
+				$LogLevel = 1
+			EndIf
+
+			; Adjust the global used to determine STDIO streams for child processes
+			If _GUICtrlMenu_GetItemChecked($g_hMain, $FixConsoleMenuItem, False) Then
+				$RunSTDIO = $STDIO_INHERIT_PARENT
+			Else
+				$RunSTDIO = $STDERR_MERGED
+			EndIf
 
 			; Re-enable the window when the script resumes from a blocking task
 			If BitAND(WinGetState($SettingsForm), @SW_DISABLE) Then
@@ -232,6 +278,19 @@ EndSwitch
 
 ;=====================================================================================
 ;=====================================================================================
+; Special function to handle messages from custom gui menu
+Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
+		Local $Temp = _WinAPI_LoWord($wParam)
+
+		_ConsoleWrite("_WM_COMMAND ($Temp = " & $Temp & ") " & $GUI_RUNDEFMSG, 3)
+
+		If $Temp > 1000 And $Temp < 1100 Then
+			_ConsoleWrite("Update $MenuMsg")
+			Global $MenuMsg = $Temp
+		EndIf
+
+        Return $GUI_RUNDEFMSG
+EndFunc
 
 ; Prompt for a password before continuing
 Func _Auth()
@@ -257,10 +316,8 @@ Func _UpdateCommandComboBox()
 
 	_GUICtrlComboBox_ResetContent ( $RunCombo )
 
-	$Opts = "Select or type a command"
+	$Opts = "Select or type a restic command"
 	$Opts &= "|" & "init  (Create the restic respository)"
-	$Opts &= "|" & "Create Scheduled Task  (Automaticly creates a daily backup task for 10pm)"
-	$Opts &= "|" & "Restic Browser  (Browse the repository to restore files)"
 	$Opts &= "|" & "backup " & Eval($Value_Prefix & "Backup_Path") & "  (Runs a backup)"
 	$Opts &= "|" & "forget --prune " & Eval($Value_Prefix & "Backup_Prune") & "  (Removes old backups)"
 	$Opts &= "|" & "snapshots  (Lists snapshots in the repository)"
@@ -269,7 +326,7 @@ Func _UpdateCommandComboBox()
 	$Opts &= "|" & "stats raw-data  (Show storage used)"
 	$Opts &= "|" & "version  (Show restic version information)"
 	$Opts &= "|" & "--help  (Show restic help information)"
-	GUICtrlSetData($RunCombo, $Opts, "Select or type a command")
+	GUICtrlSetData($RunCombo, $Opts, "Select or type a restic command")
 
 EndFunc
 
@@ -326,9 +383,9 @@ Func _MemoryToConfigRaw()
 
 	For $o=1 To $aValues[0]
 		$Key = $aValues[$o]
-		$KeyData = Eval($Value_Prefix & $aValues[$o])
+		$KeyValue = Eval($Value_Prefix & $aValues[$o])
 
-		$ConfigData &= $Key & "=" & $KeyData & @CRLF
+		$ConfigData &= $Key & "=" & $KeyValue & @CRLF
 	Next
 
 	Return $ConfigData
@@ -379,8 +436,11 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 	_ConsoleWrite("Command: " & $Run, 3)
 	_UpdateEnv()
 	_ConsoleWrite("_RunWait", 2)
+
+	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
 	_RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
 	_ClearEnv()
+
 EndFunc
 
 Func _Exit()
