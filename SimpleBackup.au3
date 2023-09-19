@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.199
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.200
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
