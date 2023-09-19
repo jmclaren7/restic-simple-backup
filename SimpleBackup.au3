@@ -1,10 +1,10 @@
 #NoTrayIcon
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
-#AutoIt3Wrapper_Icon=SimpleBackup.ico
+#AutoIt3Wrapper_Icon=include\SimpleBackup.ico
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.196
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.199
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -30,7 +30,7 @@
 #include <WindowsConstants.au3>
 
 ; https://github.com/jmclaren7/AutoITScripts/blob/master/CommonFunctions.au3
-#include <CommonFunctions.au3>
+#include <include\External.au3>
 
 ; Setup Logging For _ConsoleWrite
 Global $LogToFile = 1
@@ -58,7 +58,7 @@ Global $RunSTDIO = $STDERR_MERGED
 
 ; Pack and unpack the restic executable
 DirCreate($TempDir)
-If FileInstall("restic64.exe", $ResticFullPath, 1) = 0 Then
+If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
 	_ConsoleWrite("FileInstall error")
 	Exit
 Endif
@@ -195,7 +195,7 @@ Switch $Command
 				Case $BrowserMenuItem
 					; Pack and unpack the restic-browser executable
 					DirCreate($TempDir)
-					If FileInstall("Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
+					If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
 						_ConsoleWrite("FileInstall error")
 						Exit
 					Endif
