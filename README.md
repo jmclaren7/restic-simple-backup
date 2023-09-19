@@ -25,7 +25,7 @@ To add resistance to ransomware you'll need to use the b2 cli so you can specify
 ```shell
 b2.exe create-key --bucket real-bucket-name any-key-name listBuckets,readFiles,writeFiles,listFiles
 ```
-5. In SimpleBack, set the AWS_* variables and set RESTIC_REPOSITORY to the endpoint from B2, using this format: s3:<end-point>/<bucket-name>
+5. In SimpleBack, set the AWS_* variables and set RESTIC_REPOSITORY to the endpoint from B2, using this format: s3:\<end-point\>/\<bucket-name\>
 
 
 
