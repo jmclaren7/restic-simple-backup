@@ -36,6 +36,7 @@
 Global $LogToFile = 1
 Global $LogFileMaxSize = 512
 Global $LogLevel = 1
+If Not @Compiled Then $LogLevel = 3
 
 ; Setup some globals for general use
 Global $Version = 0
@@ -51,10 +52,11 @@ Global $ResticBrowserHash = "0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
 Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
 Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
-Global $Value_Prefix = "Config_"
-Global $ValidEnvs =  "RESTIC_REPOSITORY|RESTIC_PASSWORD|AZURE_ACCOUNT_NAME|AZURE_ACCOUNT_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY"
-Global $ValidValues = "Setup_Password|Backup_Path|Backup_Prune" & "|" & $ValidEnvs
+Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune"
+Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
+Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY"
 Global $RunSTDIO = $STDERR_MERGED
+Global $aConfig[]
 
 ; Pack and unpack the restic executable
 DirCreate($TempDir)
@@ -66,8 +68,15 @@ Endif
 ; Register our exit function for cleanup
 OnAutoItExitRegister("_Exit")
 
-; Load data from config and load to variables
-_ReadConfig()
+; Load data from config and load to array
+$aConfig = _ConfigToArray(_ReadConfig())
+
+; If config is empty load it with the template, ortherwise make sure it at least has required settings
+if UBound($aConfig) = 0 Then
+	_ForceRequiredConfig($aConfig, $SettingsTemplate)
+Else
+	_ForceRequiredConfig($aConfig, $RequiredSettings)
+EndIf
 
 ; Interpret command line parameters
 If $CmdLine[0] >= 1 Then
@@ -97,8 +106,8 @@ Switch $Command
 
 	; Backup command
 	Case "backup"
-		_Restic("backup """ & Eval($Value_Prefix & "Backup_Path") & """")
-		_Restic("forget --prune " & Eval($Value_Prefix & "Backup_Prune"))
+		_Restic("backup """ & _KeyValue($aConfig, "Backup_Path") & """")
+		_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
 
 	; Setup GUI
 	Case "setup"
@@ -131,10 +140,11 @@ Switch $Command
 		; Set some of the GUI parameters that we don't or can't do in Koda
 		;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
 		WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
-		GUICtrlSetData($ScriptEdit, _MemoryToConfigRaw()) ; Load the edit box with config data
+		GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 		_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
 		_UpdateCommandComboBox() ; Set the options in the combobox
 
+		; Setup a custom menu
 		Global $MenuMsg = 0
 		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem
 		; Create menus
@@ -157,7 +167,7 @@ Switch $Command
 		If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 		GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
-
+		; GUI loop
 		While 1
 			$nMsg = GUIGetMsg()
 			; Add menu actions from custom menu gui
@@ -171,9 +181,8 @@ Switch $Command
 			Switch $nMsg
 				; Save or save and close
 				Case $ApplyButton, $OKButton
-					$GuiData = GUICtrlRead($ScriptEdit)
-					_ConfigRawToMemory($GuiData)
-					_WriteConfig()
+					$aConfig = _ConfigToArray(GUICtrlRead($ScriptEdit))
+					_WriteConfig(_ArrayToConfig($aConfig))
 
 					If $nMsg = $OKButton Then Exit
 
@@ -215,7 +224,7 @@ Switch $Command
 					EndIf
 
 					; Load the restic credential envs and start restic-browser.exe
-					_UpdateEnv()
+					_UpdateEnv($aConfig)
 					$ResticBrowserPid = Run($ResticBrowserFullPath)
 
 				Case $ScheduledTaskMenuItem
@@ -309,7 +318,7 @@ Func _Auth()
 
 	While 1
 		; Check input first to deal with empty password
-		If $InputPass = Eval($Value_Prefix & "Setup_Password") Then ExitLoop
+		If $InputPass = _KeyValue($aConfig, "Setup_Password") Then ExitLoop
 
 		$InputPass = InputBox($TitleVersion, "Enter Password", "", "*", Default, 130)
 		If @error Then Exit
@@ -327,8 +336,8 @@ Func _UpdateCommandComboBox()
 
 	$Opts = "Select or type a restic command"
 	$Opts &= "|" & "init  (Create the restic respository)"
-	$Opts &= "|" & "backup " & Eval($Value_Prefix & "Backup_Path") & "  (Runs a backup)"
-	$Opts &= "|" & "forget --prune " & Eval($Value_Prefix & "Backup_Prune") & "  (Removes old backups)"
+	$Opts &= "|" & "backup " & _KeyValue($aConfig, "Backup_Path") & "  (Runs a backup)"
+	$Opts &= "|" & "forget --prune " & _KeyValue($aConfig, "Backup_Prune") & "  (Removes old backups)"
 	$Opts &= "|" & "snapshots  (Lists snapshots in the repository)"
 	$Opts &= "|" & "unlock  (Unlocks the repository in case restic had an issue)"
 	$Opts &= "|" & "check --read-data  (Verifies all data in repo SLOW!!!)"
@@ -339,62 +348,94 @@ Func _UpdateCommandComboBox()
 
 EndFunc
 
-; Update the enviromental variables from the valid list
-Func _UpdateEnv()
+; Update the enviromental variables
+Func _UpdateEnv($aArray, $Delete = Default)
 	_ConsoleWrite("_UpdateEnv", 3)
 
-	Local $aValues = StringSplit($ValidEnvs, "|")
-	For $o=1 To $aValues[0]
-		Local $Value = Eval($Value_Prefix & $aValues[$o])
-		If $Value <> "" Then EnvSet($aValues[$o], $Value)
+	If $Delete = Default Then $Delete = False
 
+	Local $aInternalSettings = StringSplit($InternalSettings, "|")
+
+	;_ArrayDisplay($aArray)
+	;_ArrayDisplay($aInternalSettings)
+
+	; Loop array and combine key=value pairs
+	For $i=1 To $aArray[0][0]
+		; Skip If the value is a comment, empty or internal
+		If StringLeft($aArray[$i][0], 1) = "#" Then ContinueLoop
+		If $aArray[$i][0] = "" OR $aArray[$i][1] = "" Then ContinueLoop
+		If _ArraySearch ($aInternalSettings, $aArray[$i][0], 0, 0, 0, 0) <> -1 Then ContinueLoop
+
+		If $Delete Then
+			_ConsoleWrite("  EnvSet (Delete): " & $aArray[$i][0], 3)
+			EnvSet($aArray[$i][0], "")
+		Else
+			_ConsoleWrite("  EnvSet: " & $aArray[$i][0], 3)
+			EnvSet($aArray[$i][0], $aArray[$i][1])
+		EndIf
 	Next
 
 	Return
 EndFunc
 
-; Remove enviromental variables to try and prevent them from being read externally
-Func _ClearEnv()
-	_ConsoleWrite("_ClearEnv", 3)
+; Force required keys to show in the config array
+Func _ForceRequiredConfig(Byref $aArray, $sRequired)
+	$sRequired = StringSplit($sRequired, "|")
 
-	$aValues = StringSplit($ValidEnvs, "|")
-	For $o=1 To $aValues[0]
-		EnvSet($aValues[$o], "")
+	For $i = 1 To $sRequired[0]
+		_KeyValue($aArray, $sRequired[$i])
+		If @error Then _KeyValue($aArray, $sRequired[$i], "")
 
 	Next
-
-	Return
-
 EndFunc
 
-; Convert a tring of key=value pairs into internal variables
-Func _ConfigRawToMemory($ConfigData)
-	_ConsoleWrite("_ConfigRawToMemory", 3)
+; Converts string of key=value pairs to array and handles comments
+Func _ConfigToArray($ConfigData)
+	_ConsoleWrite("_ConfigToArray", 3)
 
-	$ConfigData = StringSplit($ConfigData, @CRLF)
+	$aConfigLines = StringSplit($ConfigData, @CRLF, 1)
+	Local $aArray[]
 
-	For $o=1 To $ConfigData[0]
-		$Key = StringLeft($ConfigData[$o], StringInStr($ConfigData[$o], "=") - 1)
-		$KeyValue = StringTrimLeft($ConfigData[$o], StringInStr($ConfigData[$o], "="))
+	; Loop through each line
+	For $i = 1 To $aConfigLines[0]
+		; Prefix comments with #<UID>= so that we can treat them as a key=value pair, each with a unique key
+		If StringLeft($aConfigLines[$i], 1) = "#" Then $aConfigLines[$i] = "#" & $i & "=" & $aConfigLines[$i]
 
-		Assign($Value_Prefix & $Key, $KeyValue, $ASSIGN_FORCEGLOBAL)
+		$Key = StringLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "=") - 1)
+		$Key = StringStripWS ($Key, 1 + 2)
+
+		If $Key = "" Then ContinueLoop
+
+		$KeyValue = StringTrimLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "="))
+		$KeyValue = StringStripWS($KeyValue, 1 + 2)
+
+		_KeyValue($aArray, $Key, $KeyValue)
 	Next
 
+
+	Return $aArray
 EndFunc
 
-; Convert internal variables back into a string of key=value pairs
-Func _MemoryToConfigRaw()
-	_ConsoleWrite("_MemoryToConfigRaw", 3)
+; Converts array back to a string of key=value pairs and fix comments
+Func _ArrayToConfig($aArray)
+	_ConsoleWrite("_ArrayToConfig", 3)
 
-	Local $ConfigData
+	If UBound($aArray, 0) <> 2 Then Return SetError(1, 0, "")
 
-	$aValues = StringSplit($ValidValues, "|")
+	Local $ConfigData, $Add
 
-	For $o=1 To $aValues[0]
-		$Key = $aValues[$o]
-		$KeyValue = Eval($Value_Prefix & $aValues[$o])
+	; Loop array and combine key=value pairs
+	For $i=1 To $aArray[0][0]
+		; If the value is a comment remove the placeholder key
+		If StringLeft($aArray[$i][0], 1) = "#" Then
+			$Add = $aArray[$i][1]
+		ElseIf $aArray[$i][0] = "" Then
+			ContinueLoop
+		Else
+			$Add = $aArray[$i][0] & "=" & $aArray[$i][1]
+		EndIf
 
-		$ConfigData &= $Key & "=" & $KeyValue & @CRLF
+		$ConfigData = $ConfigData & $Add & @CRLF
 	Next
 
 	Return $ConfigData
@@ -409,16 +450,12 @@ Func _ReadConfig()
 	; Decypt Data Here
 	$ConfigData = BinaryToString(_Crypt_DecryptData($ConfigData, $HwKey, $CALG_AES_256))
 
-	_ConfigRawToMemory($ConfigData)
-
 	Return $ConfigData
 EndFunc
 
 ; Convert internal variables to string, encrypt and write the config file
-Func _WriteConfig()
+Func _WriteConfig($ConfigData)
 	_ConsoleWrite("_WriteConfig", 3)
-
-	Local $ConfigData = _MemoryToConfigRaw()
 
 	; Encrypt
 	$ConfigData = _Crypt_EncryptData($ConfigData, $HwKey, $CALG_AES_256)
@@ -442,13 +479,13 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	Local $Run = $ResticFullPath & " " & $Command
 
-	_ConsoleWrite("Command: " & $Run, 3)
-	_UpdateEnv()
-	_ConsoleWrite("_RunWait", 2)
+	_ConsoleWrite("  Command: " & $Run, 3)
+	_UpdateEnv($aConfig)
+	_ConsoleWrite("  _RunWait", 2)
 
 	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
 	_RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
-	_ClearEnv()
+	_UpdateEnv($aConfig, True) ; Remove env values
 
 EndFunc
 
@@ -468,6 +505,6 @@ Func _Exit()
 		_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")", 3)
 	Next
 
-	_ConsoleWrite("Cleanup Done, Exiting Program")
+	_ConsoleWrite("  Cleanup Done, Exiting Program")
 EndFunc
 
