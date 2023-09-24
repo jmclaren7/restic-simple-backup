@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.203
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.204
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -39,41 +39,49 @@ Global $LogFileMaxSize = 512
 Global $LogLevel = 1
 If Not @Compiled Then $LogLevel = 3
 
-; Setup some globals for general use
+; Setup version and program title globals
 Global $Version = 0
 If @Compiled Then $Version = FileGetVersion(@AutoItExe)
 Global $Title = StringTrimRight(@ScriptName, 4)
 Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Version,".", 0, -1))
 _ConsoleWrite("Starting " & $TitleVersion)
+
+; Setup some miscellaneous globals
 Global $TempDir = _TempFile (@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
-Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c"
-Global $ResticBrowserHash = "0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
-Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
 Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
 Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
-Global $SMTPSettings = "SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|Backup_Name|SMTP_SendOnFailure|SMTP_SendOnSuccess"
+Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|SMTP_SendOnFailure|SMTP_SendOnSuccess"
 Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
-Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|" & $SMTPSettings
-Global $RunSTDIO = $STDERR_MERGED
-Global $aConfig[]
+Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
 
-; Pack and unpack the restic executable
+; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
+; This value changes depending on program contexts to give us the most aplicable output
+Global $RunSTDIO = $STDERR_MERGED
+
+; These hashes are used to verify the binaries right before they run
+Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c"
+Global $ResticBrowserHash = "0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
+
+; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
+Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
+
+; Register our exit function for cleanup
+OnAutoItExitRegister("_Exit")
+
+; Pack and unpack the Restic executable
 DirCreate($TempDir)
 If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
 	_ConsoleWrite("FileInstall error")
 	Exit
 Endif
 
-; Register our exit function for cleanup
-OnAutoItExitRegister("_Exit")
-
 ; Load data from config and load to array
-$aConfig = _ConfigToArray(_ReadConfig())
+Global $aConfig = _ConfigToArray(_ReadConfig())
 
-; If config is empty load it with the template, ortherwise make sure it at least has required settings
+; If config is empty load it with the template, otherwise make sure it at least has required settings
 if UBound($aConfig) = 0 Then
 	_ForceRequiredConfig($aConfig, $SettingsTemplate)
 Else
@@ -97,11 +105,11 @@ Switch $Command
 		_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
 		_ConsoleWrite("Valid Script Commands: setup, command")
 
-	; Basic commands allowed to be passed to the restic executable
+	; Basic commands allowed to be passed to the Restic executable
 	Case "version", "stats", "init", "check", "snapshots", "--help"
 		_Restic($Command)
 
-	; Pass arbitrary commands to the restic executable
+	; Pass arbitrary commands to the Restic executable
 	Case "c", "command"
 		_Auth()
 
@@ -110,7 +118,7 @@ Switch $Command
 
 	; Backup command
 	Case "backup"
-		$Result = _Restic("backup """ & _KeyValue($aConfig, "Backup_Path") & """")
+		$Result = _Restic("backup " & _KeyValue($aConfig, "Backup_Path") & " --no-scan")
 		$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
 
 		; If the backup result and email options match, send an email
@@ -202,11 +210,35 @@ Switch $Command
 			Switch $nMsg
 				; Save or save and close
 				Case $ApplyButton, $OKButton
+					_ConsoleWrite("Apply/Ok")
 					$aConfig = _ConfigToArray(GUICtrlRead($ScriptEdit))
 					_WriteConfig(_ArrayToConfig($aConfig))
 
+					; Warn user if the backup path doesn't make sense
+					$ErrorMessage = "Back_Path might contain an invalid path, your settings have been saved but please verify you have specified a valid path and used quotes properly. This warning was triggered based on the follow text..."
+					$sBackup_Path = _KeyValue($aConfig, "Backup_Path")
+					$aBackup_Path = StringRegExp($sBackup_Path, '["''].*?["'']', $STR_REGEXPARRAYGLOBALMATCH)
+
+					; Check for paths inside quoted strings
+					If IsArray($aBackup_Path) Then
+						For $i = 0 To UBound($aBackup_Path) - 1
+							$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
+							If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $aBackup_Path[$i])
+
+						Next
+					; No quoted strings were found so check the entire string
+					Else
+						$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
+						If Not FileExists($StrippedPath) Then
+							; The entire string wasn't a path so test up to the first space
+							; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
+							$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
+							If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $sBackup_Path)
+						EndIf
+					EndIf
 					If $nMsg = $OKButton Then Exit
 
+					; Since we just changed some settings, update the combo box which might be using data from our settings
 					_UpdateCommandComboBox()
 
 				; Close program
@@ -214,7 +246,7 @@ Switch $Command
 					; Exit and run the registered exit function for cleanup
 					Exit
 
-				; Handle menu items that use checkboxes
+				; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
 				Case $FixConsoleMenuItem, $VerboseMenuItem
 					If  _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
 						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , False, False)
@@ -223,14 +255,14 @@ Switch $Command
 					EndIf
 
 				Case $BrowserMenuItem
-					; Pack and unpack the restic-browser executable
+					; Pack and unpack the Restic-Browser executable
 					DirCreate($TempDir)
 					If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
 						_ConsoleWrite("FileInstall error")
 						Exit
 					Endif
 
-					; Update PATH env so that restic-browser.exe can start restic.exe
+					; Update PATH env so that Restic-browser.exe can start restic.exe
 					$EnvPath = EnvGet("Path")
 					If Not StringInStr($EnvPath, $TempDir) Then
 						EnvSet("Path", $TempDir & ";" & $EnvPath)
@@ -244,7 +276,7 @@ Switch $Command
 						Exit
 					EndIf
 
-					; Load the restic credential envs and start restic-browser.exe
+					; Load the Restic credential envs and start restic-browser.exe
 					_UpdateEnv($aConfig)
 					$ResticBrowserPid = Run($ResticBrowserFullPath)
 
@@ -326,7 +358,7 @@ EndSwitch
 
 ;=====================================================================================
 ;=====================================================================================
-; Special function to handle messages from custom gui menu
+; Special function to handle messages from custom GUI menu
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 		Local $Temp = _WinAPI_LoWord($wParam)
 
@@ -364,21 +396,21 @@ Func _UpdateCommandComboBox()
 
 	_GUICtrlComboBox_ResetContent ( $RunCombo )
 
-	$Opts = "Select or type a restic command"
-	$Opts &= "|" & "init  (Create the restic respository)"
+	$Opts = "Select or type a Restic command"
+	$Opts &= "|" & "init  (Create the Restic repository)"
 	$Opts &= "|" & "backup " & _KeyValue($aConfig, "Backup_Path") & "  (Runs a backup)"
 	$Opts &= "|" & "forget --prune " & _KeyValue($aConfig, "Backup_Prune") & "  (Removes old backups)"
 	$Opts &= "|" & "snapshots  (Lists snapshots in the repository)"
-	$Opts &= "|" & "unlock  (Unlocks the repository in case restic had an issue)"
+	$Opts &= "|" & "unlock  (Unlocks the repository in case Restic had an issue)"
 	$Opts &= "|" & "check --read-data  (Verifies all data in repo SLOW!!!)"
 	$Opts &= "|" & "stats raw-data  (Show storage used)"
-	$Opts &= "|" & "version  (Show restic version information)"
-	$Opts &= "|" & "--help  (Show restic help information)"
-	GUICtrlSetData($RunCombo, $Opts, "Select or type a restic command")
+	$Opts &= "|" & "version  (Show Restic version information)"
+	$Opts &= "|" & "--help  (Show Restic help information)"
+	GUICtrlSetData($RunCombo, $Opts, "Select or type a Restic command")
 
 EndFunc
 
-; Update the enviromental variables
+; Update the environmental variables
 Func _UpdateEnv($aArray, $Delete = Default)
 	_ConsoleWrite("_UpdateEnv", 3)
 
@@ -407,12 +439,21 @@ EndFunc
 
 ; Force required keys to show in the config array
 Func _ForceRequiredConfig(Byref $aArray, $sRequired)
+	Local $aKeyValuem, $sValue
+
 	$sRequired = StringSplit($sRequired, "|")
 
 	For $i = 1 To $sRequired[0]
-		_KeyValue($aArray, $sRequired[$i])
-		If @error Then _KeyValue($aArray, $sRequired[$i], "")
+		$aKeyValue = StringSplit($sRequired[$i],"=")
+		_KeyValue($aArray, $aKeyValue[1])
 
+		If $aKeyValue[0] = 2 Then
+			$sValue = $aKeyValue[2]
+		Else
+			$sValue = ""
+		EndIf
+
+		If @error Then _KeyValue($aArray, $aKeyValue[1], $sValue)
 	Next
 EndFunc
 
@@ -493,7 +534,7 @@ Func _WriteConfig($ConfigData)
 	Return
 EndFunc
 
-; Execute a restic command
+; Execute a Restic command
 Func _Restic($Command, $Opt = $RunSTDIO)
 	_ConsoleWrite("_Restic", 3)
 
