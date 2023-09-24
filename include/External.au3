@@ -204,3 +204,42 @@ Func _KeyValue(ByRef $aArray, $Key, $Value = Default, $Delete = Default)
 	SetError(1)
 	Return ""
 EndFunc ;==>_KeyValue
+
+Func _INetSmtpMailCom($s_SmtpServer, $s_FromName, $s_FromAddress, $s_ToAddress, $s_Subject = "", $as_Body = "", $s_Username = "", $s_Password = "", $s_CcAddress = "", $s_BccAddress = "", $IPPort = 587, $ssl = 0, $tls = True)
+    Local $objEmail = ObjCreate("CDO.Message")
+    $objEmail.From = '"' & $s_FromName & '" <' & $s_FromAddress & '>'
+    $objEmail.To = $s_ToAddress
+    Local $i_Error = 0
+    Local $i_Error_desciption = ""
+    If $s_CcAddress <> "" Then $objEmail.Cc = $s_CcAddress
+    If $s_BccAddress <> "" Then $objEmail.Bcc = $s_BccAddress
+    $objEmail.Subject = $s_Subject
+    If StringInStr($as_Body, "<") And StringInStr($as_Body, ">") Then
+        $objEmail.HTMLBody = $as_Body
+    Else
+        $objEmail.Textbody = $as_Body & @CRLF
+    EndIf
+    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
+    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserver") = $s_SmtpServer
+    If Number($IPPort) = 0 then $IPPort = 25
+    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = $IPPort
+    ;Authenticated SMTP
+    If $s_Username <> "" Then
+        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = 1
+        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendusername") = $s_Username
+        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendpassword") = $s_Password
+    EndIf
+    ; Set security params
+    If $ssl Then $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = True
+    If $tls Then $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendtls") = True
+    ;Update settings
+    $objEmail.Configuration.Fields.Update
+    $objEmail.Fields.Update
+    ; Sent the Message
+    $objEmail.Send
+    If @error Then
+        SetError(2)
+        Return 0
+    EndIf
+    $objEmail=""
+EndFunc   ;==>_INetSmtpMailCom

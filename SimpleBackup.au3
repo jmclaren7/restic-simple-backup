@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.200
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.203
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -23,6 +23,7 @@
 #include <Crypt.au3>
 #include <WinAPIDiag.au3>
 #include <WinAPIConv.au3>
+#include <Inet.au3>
 #include <GUIConstantsEx.au3>
 #include <GuiComboBox.au3>
 #include <GuiEdit.au3>
@@ -52,9 +53,10 @@ Global $ResticBrowserHash = "0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
 Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
 Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
-Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune"
+Global $SMTPSettings = "SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|Backup_Name|SMTP_SendOnFailure|SMTP_SendOnSuccess"
+Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
-Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY"
+Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|" & $SMTPSettings
 Global $RunSTDIO = $STDERR_MERGED
 Global $aConfig[]
 
@@ -82,11 +84,13 @@ EndIf
 If $CmdLine[0] >= 1 Then
 	$Command = $CmdLine[1]
 Else
+	; Default command for when no parameters are provided
 	$Command = "setup"
 EndIf
 
 _ConsoleWrite("Command: " & $Command)
 
+; Continue based on command line or default command
 Switch $Command
 	; Display help information
 	Case "help", "/?"
@@ -106,7 +110,24 @@ Switch $Command
 
 	; Backup command
 	Case "backup"
-		_Restic("backup """ & _KeyValue($aConfig, "Backup_Path") & """")
+		$Result = _Restic("backup """ & _KeyValue($aConfig, "Backup_Path") & """")
+		$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
+
+		; If the backup result and email options match, send an email
+		If (Not $BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnFailure")) Or ($BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnSuccess")) Then
+			If $BackupSuccess Then
+				$sSubject = "[Completed]"
+			Else
+				$sSubject = "[Failed]"
+			EndIf
+			$sSubject = _KeyValue($aConfig, "Backup_Name") & " " & $sSubject & " - " & $Title
+			$sSubject = StringStripWS($sSubject, 1)
+			$sBody = $Result
+
+			_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
+				_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+		EndIf
+
 		_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
 
 	; Setup GUI
@@ -147,7 +168,7 @@ Switch $Command
 		; Setup a custom menu
 		Global $MenuMsg = 0
 		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem
-		; Create menus
+		; Create individual menus
 		$g_hFile = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hFile, 0, "Exit", $ExitMenuItem)
 		$g_hTools = _GUICtrlMenu_CreateMenu()
@@ -156,13 +177,13 @@ Switch $Command
 		$g_hAdvanced = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 0, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
 		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
-		; Create Main menu
-		$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS)) ; ..for MNS_MODELESS, only this "main menu" is needed.
+		; Create main menu
+		$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS))
 		_GUICtrlMenu_InsertMenuItem($g_hMain, 0, "&File", 0, $g_hFile)
 		_GUICtrlMenu_InsertMenuItem($g_hMain, 1, "&Tools", 0, $g_hTools)
 		_GUICtrlMenu_InsertMenuItem($g_hMain, 2, "&Advanced", 0, $g_hAdvanced)
 		_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
-
+		; Additonal menu setup
 		_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False)
 		If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 		GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
@@ -251,7 +272,16 @@ Switch $Command
 					; Continue based on combobox value
 					$RunComboText = GUICtrlRead($RunCombo)
 					Switch $RunComboText
-						Case "place holder"
+						Case "custom/advanced commands can be added here in the future"
+
+						Case "Test Email"
+							If _KeyValue($aConfig, "SMTP_Server") Then
+								$sSubject = "Test Subject"
+								$sBody = "Test Body"
+								$Return = _INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _KeyValue($aConfig, "SMTP_ToAddress"), _
+									$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+								_ConsoleWrite("Email Test: $Return=" & $Return & "  @error=" & @error)
+							EndIf
 
 						Case Else
 							_Restic($RunComboText)
@@ -355,9 +385,6 @@ Func _UpdateEnv($aArray, $Delete = Default)
 	If $Delete = Default Then $Delete = False
 
 	Local $aInternalSettings = StringSplit($InternalSettings, "|")
-
-	;_ArrayDisplay($aArray)
-	;_ArrayDisplay($aInternalSettings)
 
 	; Loop array and combine key=value pairs
 	For $i=1 To $aArray[0][0]
@@ -484,9 +511,10 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 	_ConsoleWrite("  _RunWait", 2)
 
 	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
-	_RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
+	Local $Return = _RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
 	_UpdateEnv($aConfig, True) ; Remove env values
 
+	Return $Return
 EndFunc
 
 Func _Exit()
