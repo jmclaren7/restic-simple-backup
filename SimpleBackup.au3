@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.211
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.212
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -54,7 +54,8 @@ Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP
 Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
 Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
-Global $ConfigFileFullPath = @ScriptDir & "\" & StringTrimRight(@ScriptName, 4) & ".dat"
+Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
+Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
 
 ; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
 ; This value changes depending on program contexts to give us the most aplicable output
@@ -99,280 +100,326 @@ Next
 If $Command = Default Then $Command = "setup"
 _ConsoleWrite("Command: " & $Command)
 
-; Load config from file and load to array
-Global $aConfig = _ConfigToArray(_ReadConfig())
+; This loop is used to effectively restart the program for when we switch profiles
+While 1
+	; Load config from file and load to array
+	Global $aConfig = _ConfigToArray(_ReadConfig())
 
-; If config is empty load it with the template, otherwise make sure it at least has required settings
-if UBound($aConfig) = 0 Then
-	_ForceRequiredConfig($aConfig, $SettingsTemplate)
-Else
-	_ForceRequiredConfig($aConfig, $RequiredSettings)
-EndIf
+	; If config is empty load it with the template, otherwise make sure it at least has required settings
+	if UBound($aConfig) = 0 Then
+		_ForceRequiredConfig($aConfig, $SettingsTemplate)
+	Else
+		_ForceRequiredConfig($aConfig, $RequiredSettings)
+	EndIf
 
-; Continue based on command line or default command
-Switch $Command
-	; Display help information
-	Case "help", "/?"
-		_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
-		_ConsoleWrite("Valid Script Commands: setup, command")
+	; Continue based on command line or default command
+	Switch $Command
+		; Display help information
+		Case "help", "/?"
+			_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
+			_ConsoleWrite("Valid Script Commands: setup, command")
 
-	; Basic commands allowed to be passed to the Restic executable
-	Case "version", "stats", "init", "check", "snapshots", "--help"
-		_Restic($Command)
+		; Basic commands allowed to be passed to the Restic executable
+		Case "version", "stats", "init", "check", "snapshots", "--help"
+			_Restic($Command)
 
-	; Pass arbitrary commands to the Restic executable
-	Case "c", "command"
-		_Auth()
+		; Pass arbitrary commands to the Restic executable
+		Case "c", "command"
+			_Auth()
 
-		$Run = StringTrimLeft($CmdLineRaw, StringLen($CmdLine[1]) + 1)
-		_Restic($Run)
+			$Run = StringTrimLeft($CmdLineRaw, StringLen($CmdLine[1]) + 1)
+			_Restic($Run)
 
-	; Backup command
-	Case "backup"
-		$Result = _Restic("backup " & _KeyValue($aConfig, "Backup_Path") & " --no-scan")
-		$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
+		; Backup command
+		Case "backup"
+			$Result = _Restic("backup " & _KeyValue($aConfig, "Backup_Path") & " --no-scan")
+			$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
 
-		; If the backup result and email options match, send an email
-		If (Not $BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnFailure")) Or ($BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnSuccess")) Then
-			If $BackupSuccess Then
-				$sSubject = "[Completed]"
-			Else
-				$sSubject = "[Failed]"
+			; If the backup result and email options match, send an email
+			If (Not $BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnFailure")) Or ($BackupSuccess And _KeyValue($aConfig, "SMTP_SendOnSuccess")) Then
+				If $BackupSuccess Then
+					$sSubject = "[Completed]"
+				Else
+					$sSubject = "[Failed]"
+				EndIf
+				$sSubject = _KeyValue($aConfig, "Backup_Name") & " " & $sSubject & " - " & $Title
+				$sSubject = StringStripWS($sSubject, 1)
+				$sBody = $Result
+
+				_ConsoleWrite("Sending Email " & $sSubject)
+				_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
+					_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+
 			EndIf
-			$sSubject = _KeyValue($aConfig, "Backup_Name") & " " & $sSubject & " - " & $Title
-			$sSubject = StringStripWS($sSubject, 1)
-			$sBody = $Result
 
-			_ConsoleWrite("Sending Email " & $sSubject)
-			_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
-				_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+			_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
 
-		EndIf
+		; Setup GUI
+		Case "setup"
+			WinMove("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]", "", 4, 4)
 
-		_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
+			_Auth()
 
-	; Setup GUI
-	Case "setup"
-		WinMove("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]", "", 4, 4)
+			Global $SettingsForm, $RunCombo
 
-		_Auth()
+			#Region ### START Koda GUI section ###
+			$SettingsForm = GUICreate("Title", 601, 533, -1, -1, BitOR($GUI_SS_DEFAULT_GUI,$WS_SIZEBOX,$WS_THICKFRAME))
+			$ApplyButton = GUICtrlCreateButton("Apply", 510, 496, 75, 25)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 585, 441, BitOR($GUI_SS_DEFAULT_EDIT,$WS_BORDER), 0)
+			GUICtrlSetData(-1, "")
+			GUICtrlSetFont(-1, 10, 400, 0, "Consolas")
+			GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKTOP+$GUI_DOCKBOTTOM)
+			$CancelButton = GUICtrlCreateButton("Cancel", 425, 496, 75, 25)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			$OKButton = GUICtrlCreateButton("OK", 339, 496, 75, 25)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			$RunButton = GUICtrlCreateButton("Run", 532, 456, 51, 33)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 462, 505, 25, BitOR($CBS_DROPDOWN,$CBS_AUTOHSCROLL))
+			GUICtrlSetFont(-1, 9, 400, 0, "Consolas")
+			GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKHEIGHT)
+			GUISetState(@SW_SHOW)
+			#EndRegion ### END Koda GUI section ###
 
-		Global $SettingsForm, $RunCombo
+			; Set some of the GUI parameters that we don't or can't do in Koda
+			;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
+			WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
+			GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
+			_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
+			_UpdateCommandComboBox() ; Set the options in the combobox
 
-		#Region ### START Koda GUI section ###
-		$SettingsForm = GUICreate("Title", 601, 533, -1, -1, BitOR($GUI_SS_DEFAULT_GUI,$WS_SIZEBOX,$WS_THICKFRAME))
-		$ApplyButton = GUICtrlCreateButton("Apply", 510, 496, 75, 25)
-		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 585, 441, BitOR($GUI_SS_DEFAULT_EDIT,$WS_BORDER), 0)
-		GUICtrlSetData(-1, "")
-		GUICtrlSetFont(-1, 10, 400, 0, "Consolas")
-		GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKTOP+$GUI_DOCKBOTTOM)
-		$CancelButton = GUICtrlCreateButton("Cancel", 425, 496, 75, 25)
-		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$OKButton = GUICtrlCreateButton("OK", 339, 496, 75, 25)
-		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$RunButton = GUICtrlCreateButton("Run", 532, 456, 51, 33)
-		GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-		$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 462, 505, 25, BitOR($CBS_DROPDOWN,$CBS_AUTOHSCROLL))
-		GUICtrlSetFont(-1, 9, 400, 0, "Consolas")
-		GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKHEIGHT)
-		GUISetState(@SW_SHOW)
-		#EndRegion ### END Koda GUI section ###
+			; Setup a custom menu
+			Global $MenuMsg = 0
+			If Not IsDeclared("ExitMenuItem") Then Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem
 
-		; Set some of the GUI parameters that we don't or can't do in Koda
-		;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
-		WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
-		GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
-		_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
-		_UpdateCommandComboBox() ; Set the options in the combobox
+			; Setup file menu
+			$g_hFile = _GUICtrlMenu_CreateMenu()
+			; Create menu items based on config files found
+			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringReplace($ConfigFile, ".dat", "*.dat"), 1, True)
+			For $i = 1 To Ubound($aConfigFiles) - 1
+				$ProfileName = StringTrimLeft($aConfigFiles[$i], StringInStr($aConfigFiles[$i], "\", 0, -1))
+				$cmdID = 1100 + $i
+				Assign( "ProfileMenuItem" & $cmdID, $cmdID)
+				If $aConfigFiles[$i] = $ConfigFileFullPath Then $ProfileName = $ProfileName & " (Current Profile)"
+				_GUICtrlMenu_InsertMenuItem($g_hFile, -1, $ProfileName, $cmdID)
+				If $aConfigFiles[$i] = $ConfigFileFullPath Then _GUICtrlMenu_SetItemDisabled($g_hFile, $cmdID, True, False)
+			Next
+			_GUICtrlMenu_InsertMenuItem($g_hFile, -1, "New Profile/Config...", $NewProfileMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hFile, -1, "")
+			_GUICtrlMenu_InsertMenuItem($g_hFile, -1, "Exit", $ExitMenuItem)
 
-		; Setup a custom menu
-		Global $MenuMsg = 0
-		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem, $TemplateMenuItem
-		; Create individual menus
-		$g_hFile = _GUICtrlMenu_CreateMenu()
-		_GUICtrlMenu_InsertMenuItem($g_hFile, 0, "Exit", $ExitMenuItem)
-		$g_hTools = _GUICtrlMenu_CreateMenu()
-		_GUICtrlMenu_InsertMenuItem($g_hTools, 0, "Create/Reset Scheduled Task", $ScheduledTaskMenuItem)
-		_GUICtrlMenu_InsertMenuItem($g_hTools, 1, "Open Restic Browser", $BrowserMenuItem)
-		_GUICtrlMenu_InsertMenuItem($g_hTools, 2, "Add Missing Configuration Options From Template", $TemplateMenuItem)
-		$g_hAdvanced = _GUICtrlMenu_CreateMenu()
-		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 0, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
-		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
-		; Create main menu
-		$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS))
-		_GUICtrlMenu_InsertMenuItem($g_hMain, 0, "&File", 0, $g_hFile)
-		_GUICtrlMenu_InsertMenuItem($g_hMain, 1, "&Tools", 0, $g_hTools)
-		_GUICtrlMenu_InsertMenuItem($g_hMain, 2, "&Advanced", 0, $g_hAdvanced)
-		_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
-		; Additonal menu setup
-		_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False)
-		If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
-		GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
+			; Setup tools menu
+			$g_hTools = _GUICtrlMenu_CreateMenu()
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task", $ScheduledTaskMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Open Restic Browser", $BrowserMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Add Missing Configuration Options From Template", $TemplateMenuItem)
 
-		; GUI loop
-		While 1
-			$nMsg = GUIGetMsg()
-			; Add menu actions from custom menu gui
-			If $nMsg = 0 And $MenuMsg <> 0 Then
-				$nMsg = $MenuMsg
-				$MenuMsg = 0
-			Endif
-			If $nMsg <> 0 And $nMsg <> -11 Then _ConsoleWrite("Merged $nMsg = "&$nMsg, 3)
+			; Setup advanced menu
+			$g_hAdvanced = _GUICtrlMenu_CreateMenu()
+			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
 
-			; Continue based on GUI action
-			Switch $nMsg
-				; Save or save and close
-				Case $ApplyButton, $OKButton
-					_ConsoleWrite("Apply/Ok")
-					$aConfig = _ConfigToArray(GUICtrlRead($ScriptEdit))
-					_WriteConfig(_ArrayToConfig($aConfig))
+			; Setup main menu
+			$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS))
+			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&File", 0, $g_hFile)
+			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Tools", 0, $g_hTools)
+			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Advanced", 0, $g_hAdvanced)
 
-					; Warn user if the backup path doesn't make sense
-					$ErrorMessage = "Back_Path might contain an invalid path, your settings have been saved but please verify you have specified a valid path and used quotes properly. This warning was triggered based on the follow text..."
-					$sBackup_Path = _KeyValue($aConfig, "Backup_Path")
-					$aBackup_Path = StringRegExp($sBackup_Path, '["''].*?["'']', $STR_REGEXPARRAYGLOBALMATCH)
+			; Create menu
+			_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
 
-					; Check for paths inside quoted strings
-					If IsArray($aBackup_Path) Then
-						For $i = 0 To UBound($aBackup_Path) - 1
-							$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
-							If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $aBackup_Path[$i])
+			; Additonal menu setup
+			_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False) ;
+			If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
+			GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
-						Next
-					; No quoted strings were found so check the entire string
-					Else
-						$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
-						If Not FileExists($StrippedPath) Then
-							; The entire string wasn't a path so test up to the first space
-							; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
-							$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
-							If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $sBackup_Path)
-						EndIf
-					EndIf
-					If $nMsg = $OKButton Then Exit
+			; GUI loop
+			While 1
+				$nMsg = GUIGetMsg()
+				; Add menu actions from custom menu gui
+				If $nMsg = 0 And $MenuMsg <> 0 Then
+					$nMsg = $MenuMsg
+					$MenuMsg = 0
+				Endif
+				If $nMsg <> 0 And $nMsg <> -11 Then _ConsoleWrite("Merged $nMsg = " & $nMsg, 3)
 
-					; Since we just changed some settings, update the combo box which might be using data from our settings
-					_UpdateCommandComboBox()
+				; Continue based on GUI action
+				Switch $nMsg
+					; Save or save and close
+					Case $ApplyButton, $OKButton
+						_ConsoleWrite("Apply/Ok")
+						$aConfig = _ConfigToArray(GUICtrlRead($ScriptEdit))
+						_WriteConfig(_ArrayToConfig($aConfig))
 
-				; Close program
-				Case $GUI_EVENT_CLOSE, $CancelButton, $ExitMenuItem
-					; Exit and run the registered exit function for cleanup
-					Exit
+						; Warn user if the backup path doesn't make sense
+						$ErrorMessage = "Back_Path might contain an invalid path, your settings have been saved but please verify you have specified a valid path and used quotes properly. This warning was triggered based on the follow text..."
+						$sBackup_Path = _KeyValue($aConfig, "Backup_Path")
+						$aBackup_Path = StringRegExp($sBackup_Path, '["''].*?["'']', $STR_REGEXPARRAYGLOBALMATCH)
 
-				; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
-				Case $FixConsoleMenuItem, $VerboseMenuItem
-					If  _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
-						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , False, False)
-					Else
-						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
-					EndIf
+						; Check for paths inside quoted strings
+						If IsArray($aBackup_Path) Then
+							For $i = 0 To UBound($aBackup_Path) - 1
+								$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
+								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $aBackup_Path[$i])
 
-				Case $TemplateMenuItem
-					_ForceRequiredConfig($aConfig, $SettingsTemplate)
-					GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
-
-				Case $BrowserMenuItem
-					; Pack and unpack the Restic-Browser executable
-					DirCreate($TempDir)
-					If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
-						_ConsoleWrite("FileInstall error")
-						Exit
-					Endif
-
-					; Update PATH env so that Restic-browser.exe can start restic.exe
-					$EnvPath = EnvGet("Path")
-					If Not StringInStr($EnvPath, $TempDir) Then
-						EnvSet("Path", $TempDir & ";" & $EnvPath)
-						_ConsoleWrite("EnvSet: "&@error)
-					EndIf
-
-					; Verify the hash of the restic-browser.exe
-					Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
-					If $Hash <> $ResticBrowserHash Then
-						_ConsoleWrite("Hash error - " & $Hash)
-						Exit
-					EndIf
-
-					; Load the Restic credential envs and start restic-browser.exe
-					_UpdateEnv($aConfig)
-					$ResticBrowserPid = Run($ResticBrowserFullPath)
-
-				Case $ScheduledTaskMenuItem
-					$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
-					_ConsoleWrite($Run)
-					$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
-					If StringInStr($Return, "SUCCESS: ") Then
-						MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
-					Else
-						MsgBox($MB_ICONERROR, $TitleVersion, "Error creating scheduled task.")
-					EndIf
-
-
-				; Run the command provided from the combobox
-				Case $RunButton
-					; Adjust window visibility and activation due to long running process
-					GUISetState(@SW_DISABLE, $SettingsForm)
-					WinSetTrans($SettingsForm, "", 180)
-					If @Compiled Then WinActivate("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]")
-
-					; Don't continue if combo box is on the placeholder text
-					If _GUICtrlComboBox_GetCurSel($RunCombo) = 0 Then ContinueLoop
-
-					; Continue based on combobox value
-					$RunComboText = GUICtrlRead($RunCombo)
-					Switch $RunComboText
-						Case "custom/advanced commands can be added here in the future"
-
-						Case "Test Email"
-							If _KeyValue($aConfig, "SMTP_Server") Then
-								$sSubject = "Test Subject"
-								$sBody = "Test Body"
-								$Return = _INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _KeyValue($aConfig, "SMTP_ToAddress"), _
-									$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
-								_ConsoleWrite("Email Test: $Return=" & $Return & "  @error=" & @error)
+							Next
+						; No quoted strings were found so check the entire string
+						Else
+							$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
+							If Not FileExists($StrippedPath) Then
+								; The entire string wasn't a path so test up to the first space
+								; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
+								$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
+								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $sBackup_Path)
 							EndIf
+						EndIf
+						If $nMsg = $OKButton Then Exit
 
-						Case Else
-							_Restic($RunComboText)
+						; Since we just changed some settings, update the combo box which might be using data from our settings
+						_UpdateCommandComboBox()
 
-					EndSwitch
-			EndSwitch
+					; Close program
+					Case $GUI_EVENT_CLOSE, $CancelButton, $ExitMenuItem
+						; Exit and run the registered exit function for cleanup
+						Exit
 
-			; Adjust $LogLevel
-			If _GUICtrlMenu_GetItemChecked($g_hMain, $VerboseMenuItem, False) Then
-				$LogLevel = 3
-			Else
-				$LogLevel = 1
-			EndIf
+					; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
+					Case $FixConsoleMenuItem, $VerboseMenuItem
+						If  _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
+							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , False, False)
+						Else
+							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
+						EndIf
 
-			; Adjust the global used to determine STDIO streams for child processes
-			If _GUICtrlMenu_GetItemChecked($g_hMain, $FixConsoleMenuItem, False) Then
-				$RunSTDIO = $STDIO_INHERIT_PARENT
-			Else
-				$RunSTDIO = $STDERR_MERGED
-			EndIf
+					Case $TemplateMenuItem
+						_ForceRequiredConfig($aConfig, $SettingsTemplate)
+						GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 
-			; Re-enable the window when the script resumes from a blocking task
-			If BitAND(WinGetState($SettingsForm), @SW_DISABLE) Then
-				GUISetState(@SW_ENABLE, $SettingsForm)
-				WinSetTrans($SettingsForm, "", 255)
-			Endif
+					Case $NewProfileMenuItem, 1100 To 1199
+						; Create a new profile
+						_ConsoleWrite("Profile switch")
 
-			; Removes help text from combobox selection
-			$RunComboText = GUICtrlRead($RunCombo)
-			If StringRight($RunComboText, 1) = ")" And StringInStr($RunComboText, "  (") And Not _GUICtrlComboBox_GetDroppedState($RunCombo) Then
-				$NewText = StringLeft($RunComboText, StringInStr($RunComboText, "  (") -1)
-				_GUICtrlComboBox_SetEditText($RunCombo, $NewText)
-			Endif
+						If $nMsg=$NewProfileMenuItem Then
+							; Prompt for profile name and convert to full path
+							; If the profile name already exists the existing profile will load and wont be overwriten unless the user does so
+							$NewProfile = InputBox($TitleVersion, "Enter a name for the new profile/config", "", "", Default, 130)
+							If @error Then ContinueLoop
+							$ConfigFileFullPath = StringTrimRight($ConfigFileFullPath, 4) & "." & $NewProfile & ".dat"
+						Else
+							$ConfigFileFullPath = $aConfigFiles[$nMsg - 1100]
 
-			Sleep(10)
-		WEnd
+						Endif
 
-	Case Else
-		_ConsoleWrite("Invalid Command")
+						_ConsoleWrite("$ConfigFileFullPath=" & $ConfigFileFullPath, 3)
 
-EndSwitch
+						; Delete the GUI and restart
+						GUIDelete($SettingsForm)
+						ContinueLoop 2
+
+					Case $BrowserMenuItem
+						; Pack and unpack the Restic-Browser executable
+						DirCreate($TempDir)
+						If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
+							_ConsoleWrite("FileInstall error")
+							Exit
+						Endif
+
+						; Update PATH env so that Restic-browser.exe can start restic.exe
+						$EnvPath = EnvGet("Path")
+						If Not StringInStr($EnvPath, $TempDir) Then
+							EnvSet("Path", $TempDir & ";" & $EnvPath)
+							_ConsoleWrite("EnvSet: "&@error)
+						EndIf
+
+						; Verify the hash of the restic-browser.exe
+						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
+						If $Hash <> $ResticBrowserHash Then
+							_ConsoleWrite("Hash error - " & $Hash)
+							Exit
+						EndIf
+
+						; Load the Restic credential envs and start restic-browser.exe
+						_UpdateEnv($aConfig)
+						$ResticBrowserPid = Run($ResticBrowserFullPath)
+
+					Case $ScheduledTaskMenuItem
+						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
+						_ConsoleWrite($Run)
+						$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
+						If StringInStr($Return, "SUCCESS: ") Then
+							MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
+						Else
+							MsgBox($MB_ICONERROR, $TitleVersion, "Error creating scheduled task.")
+						EndIf
+
+
+					; Run the command provided from the combobox
+					Case $RunButton
+						; Adjust window visibility and activation due to long running process
+						GUISetState(@SW_DISABLE, $SettingsForm)
+						WinSetTrans($SettingsForm, "", 180)
+						If @Compiled Then WinActivate("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]")
+
+						; Don't continue if combo box is on the placeholder text
+						If _GUICtrlComboBox_GetCurSel($RunCombo) = 0 Then ContinueLoop
+
+						; Continue based on combobox value
+						$RunComboText = GUICtrlRead($RunCombo)
+						Switch $RunComboText
+							Case "custom/advanced commands can be added here in the future"
+
+							Case "Test Email"
+								If _KeyValue($aConfig, "SMTP_Server") Then
+									$sSubject = "Test Subject"
+									$sBody = "Test Body"
+									$Return = _INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _KeyValue($aConfig, "SMTP_ToAddress"), _
+										$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+									_ConsoleWrite("Email Test: $Return=" & $Return & "  @error=" & @error)
+								EndIf
+
+							Case Else
+								_Restic($RunComboText)
+
+						EndSwitch
+				EndSwitch
+
+				; Adjust $LogLevel
+				If _GUICtrlMenu_GetItemChecked($g_hMain, $VerboseMenuItem, False) Then
+					$LogLevel = 3
+				Else
+					$LogLevel = 1
+				EndIf
+
+				; Adjust the global used to determine STDIO streams for child processes
+				If _GUICtrlMenu_GetItemChecked($g_hMain, $FixConsoleMenuItem, False) Then
+					$RunSTDIO = $STDIO_INHERIT_PARENT
+				Else
+					$RunSTDIO = $STDERR_MERGED
+				EndIf
+
+				; Re-enable the window when the script resumes from a blocking task
+				If BitAND(WinGetState($SettingsForm), @SW_DISABLE) Then
+					GUISetState(@SW_ENABLE, $SettingsForm)
+					WinSetTrans($SettingsForm, "", 255)
+				Endif
+
+				; Removes help text from combobox selection
+				$RunComboText = GUICtrlRead($RunCombo)
+				If StringRight($RunComboText, 1) = ")" And StringInStr($RunComboText, "  (") And Not _GUICtrlComboBox_GetDroppedState($RunCombo) Then
+					$NewText = StringLeft($RunComboText, StringInStr($RunComboText, "  (") -1)
+					_GUICtrlComboBox_SetEditText($RunCombo, $NewText)
+				Endif
+
+				Sleep(10)
+			WEnd
+
+		Case Else
+			_ConsoleWrite("Invalid Command")
+
+	EndSwitch
+
+Wend
 
 ;=====================================================================================
 ;=====================================================================================
@@ -382,7 +429,7 @@ Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 
 		;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
 
-		If $Temp >= 1000 And $Temp < 1100 Then
+		If $Temp >= 1000 And $Temp < 1999 Then
 			_ConsoleWrite("Updated $MenuMsg To " & $Temp, 3)
 			Global $MenuMsg = $Temp
 		EndIf
