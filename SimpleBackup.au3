@@ -175,13 +175,14 @@ Switch $Command
 
 		; Setup a custom menu
 		Global $MenuMsg = 0
-		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem
+		Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem, $TemplateMenuItem
 		; Create individual menus
 		$g_hFile = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hFile, 0, "Exit", $ExitMenuItem)
 		$g_hTools = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hTools, 0, "Create/Reset Scheduled Task", $ScheduledTaskMenuItem)
 		_GUICtrlMenu_InsertMenuItem($g_hTools, 1, "Open Restic Browser", $BrowserMenuItem)
+		_GUICtrlMenu_InsertMenuItem($g_hTools, 2, "Add Missing Configuration Options From Template", $TemplateMenuItem)
 		$g_hAdvanced = _GUICtrlMenu_CreateMenu()
 		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 0, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
 		_GUICtrlMenu_InsertMenuItem($g_hAdvanced, 1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
@@ -253,6 +254,10 @@ Switch $Command
 					Else
 						_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
 					EndIf
+
+				Case $TemplateMenuItem
+					_ForceRequiredConfig($aConfig, $SettingsTemplate)
+					GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 
 				Case $BrowserMenuItem
 					; Pack and unpack the Restic-Browser executable
