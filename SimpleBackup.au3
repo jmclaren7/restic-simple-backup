@@ -132,8 +132,10 @@ Switch $Command
 			$sSubject = StringStripWS($sSubject, 1)
 			$sBody = $Result
 
+			_ConsoleWrite("Sending Email " & $sSubject)
 			_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
 				_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+
 		EndIf
 
 		_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
