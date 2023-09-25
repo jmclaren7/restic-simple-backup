@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.204
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.211
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -50,12 +50,11 @@ _ConsoleWrite("Starting " & $TitleVersion)
 Global $TempDir = _TempFile (@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
-Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
-Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
 Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|SMTP_SendOnFailure|SMTP_SendOnSuccess"
 Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
 Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
+Global $ConfigFileFullPath = @ScriptDir & "\" & StringTrimRight(@ScriptName, 4) & ".dat"
 
 ; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
 ; This value changes depending on program contexts to give us the most aplicable output
@@ -78,7 +77,29 @@ If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
 	Exit
 Endif
 
-; Load data from config and load to array
+; Interpret command line parameters
+$Command = Default
+For $i = 1 To $CmdLine[0]
+	_ConsoleWrite("Parameter: " & $CmdLine[$i])
+	Switch $CmdLine[$i]
+		Case "profile"
+			; The profile parameter and the following parameter are used to adjust the
+			$i = $i + 1
+			$ConfigFileFullPath = StringTrimRight($ConfigFileFullPath, 4) & "." & $CmdLine[$i] & ".dat"
+			_ConsoleWrite("Config file is now " & StringTrimLeft($ConfigFileFullPath, StringInStr($ConfigFileFullPath, "\", 0, -1)))
+
+		Case Else
+			; The first parameter not specialy handled must be the command
+			If $Command = Default Then $Command = $CmdLine[$i]
+
+	EndSwitch
+Next
+
+; Default command for when no parameters are provided
+If $Command = Default Then $Command = "setup"
+_ConsoleWrite("Command: " & $Command)
+
+; Load config from file and load to array
 Global $aConfig = _ConfigToArray(_ReadConfig())
 
 ; If config is empty load it with the template, otherwise make sure it at least has required settings
@@ -87,16 +108,6 @@ if UBound($aConfig) = 0 Then
 Else
 	_ForceRequiredConfig($aConfig, $RequiredSettings)
 EndIf
-
-; Interpret command line parameters
-If $CmdLine[0] >= 1 Then
-	$Command = $CmdLine[1]
-Else
-	; Default command for when no parameters are provided
-	$Command = "setup"
-EndIf
-
-_ConsoleWrite("Command: " & $Command)
 
 ; Continue based on command line or default command
 Switch $Command
