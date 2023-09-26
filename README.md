@@ -49,6 +49,7 @@ AWS_SECRET_ACCESS_KEY=kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
 
 ## Configuration Options
 Besides the enviromental variables available to use with Restic, SimpleBackup offers the following settings
+```
 Setup_Password
 Backup_Path
 Backup_Prune
@@ -61,3 +62,4 @@ SMTP_FromName
 SMTP_ToAddress
 SMTP_SendOnFailure (True/False)
 SMTP_SendOnSuccess (True/False)
+```
