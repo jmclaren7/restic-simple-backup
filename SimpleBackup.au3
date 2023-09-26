@@ -243,7 +243,7 @@ While 1
 					$nMsg = $MenuMsg
 					$MenuMsg = 0
 				Endif
-				If $nMsg <> 0 And $nMsg <> -11 Then _ConsoleWrite("Merged $nMsg = " & $nMsg, 3)
+				If $nMsg <> 0 And Not ($nMsg > -13 And $nMsg < -3) Then _ConsoleWrite("Merged $nMsg = " & $nMsg, 3)
 
 				; Continue based on GUI action
 				Switch $nMsg
