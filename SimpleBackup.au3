@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.212
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.215
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -56,6 +56,7 @@ Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOS
 Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
 Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
 Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
+Global $ActiveProfile = "Default"
 
 ; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
 ; This value changes depending on program contexts to give us the most aplicable output
@@ -87,6 +88,7 @@ For $i = 1 To $CmdLine[0]
 			; The profile parameter and the following parameter are used to adjust the
 			$i = $i + 1
 			$ConfigFileFullPath = StringTrimRight($ConfigFileFullPath, 4) & "." & $CmdLine[$i] & ".dat"
+			$ActiveProfile = $CmdLine[$i]
 			_ConsoleWrite("Config file is now " & StringTrimLeft($ConfigFileFullPath, StringInStr($ConfigFileFullPath, "\", 0, -1)))
 
 		Case Else
@@ -211,7 +213,7 @@ While 1
 
 			; Setup tools menu
 			$g_hTools = _GUICtrlMenu_CreateMenu()
-			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task", $ScheduledTaskMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task (Profile: " & $ActiveProfile & ")", $ScheduledTaskMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Open Restic Browser", $BrowserMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Add Missing Configuration Options From Template", $TemplateMenuItem)
 
@@ -313,6 +315,9 @@ While 1
 
 						_ConsoleWrite("$ConfigFileFullPath=" & $ConfigFileFullPath, 3)
 
+						$ActiveProfile = StringTrimRight(StringTrimLeft($ConfigFileFullPath, StringInStr($ConfigFileFullPath, "\", 0, -1) + StringLen($Title) + 1), 4)
+						_ConsoleWrite("$ActiveProfile=" & $ActiveProfile, 3)
+
 						; Delete the GUI and restart
 						GUIDelete($SettingsForm)
 						ContinueLoop 2
@@ -329,7 +334,7 @@ While 1
 						$EnvPath = EnvGet("Path")
 						If Not StringInStr($EnvPath, $TempDir) Then
 							EnvSet("Path", $TempDir & ";" & $EnvPath)
-							_ConsoleWrite("EnvSet: "&@error)
+							_ConsoleWrite("EnvSet: "&@error, 3)
 						EndIf
 
 						; Verify the hash of the restic-browser.exe
@@ -344,13 +349,22 @@ While 1
 						$ResticBrowserPid = Run($ResticBrowserFullPath)
 
 					Case $ScheduledTaskMenuItem
-						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & " /TR ""'" & @ScriptFullPath & "' backup"" /ST 22:00 /RL Highest /NP /F /RU System"
+						If $ActiveProfile <> "Default" Then
+							$ProfileSwitch = " profile " & $ActiveProfile
+							$TaskName = "." & $ActiveProfile
+						Else
+							$ProfileSwitch = ""
+							$TaskName = ""
+						EndIf
+
+						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & $TaskName  & " /TR ""'" & @ScriptFullPath & "' backup" & $ProfileSwitch & """ /ST 22:00 /RL Highest /NP /F /RU System"
 						_ConsoleWrite($Run)
 						$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
 						If StringInStr($Return, "SUCCESS: ") Then
 							MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
 						Else
 							MsgBox($MB_ICONERROR, $TitleVersion, "Error creating scheduled task.")
+							If @Compiled Then MsgBox($MB_ICONERROR, $TitleVersion, "Are you running without admin?")
 						EndIf
 
 
