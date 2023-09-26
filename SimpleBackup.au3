@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.218
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.220
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -200,10 +200,9 @@ While 1
 			; Create menu items based on config files found
 			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringReplace($ConfigFile, ".dat", "*.dat"), 1, True)
 			For $i = 1 To Ubound($aConfigFiles) - 1
-				$ProfileName = StringTrimLeft($aConfigFiles[$i], StringInStr($aConfigFiles[$i], "\", 0, -1))
+				$ProfileName = _GetProfileFromFullPath($aConfigFiles[$i])
 				$cmdID = 1100 + $i
-				Assign( "ProfileMenuItem" & $cmdID, $cmdID)
-				If $aConfigFiles[$i] = $ConfigFileFullPath Then $ProfileName = $ProfileName & " (Current Profile)"
+				If $aConfigFiles[$i] = $ConfigFileFullPath Then $ProfileName = $ProfileName & "Default (Current Profile)"
 				_GUICtrlMenu_InsertMenuItem($g_hFile, -1, $ProfileName, $cmdID)
 				If $aConfigFiles[$i] = $ConfigFileFullPath Then _GUICtrlMenu_SetItemDisabled($g_hFile, $cmdID, True, False)
 			Next
@@ -315,7 +314,7 @@ While 1
 
 						_ConsoleWrite("$ConfigFileFullPath=" & $ConfigFileFullPath, 3)
 
-						$ActiveProfile = StringTrimRight(StringTrimLeft($ConfigFileFullPath, StringInStr($ConfigFileFullPath, "\", 0, -1) + StringLen($Title) + 1), 4)
+						$ActiveProfile = _GetProfileFromFullPath($ConfigFileFullPath)
 						_ConsoleWrite("$ActiveProfile=" & $ActiveProfile, 3)
 
 						; Delete the GUI and restart
@@ -439,6 +438,16 @@ Wend
 
 ;=====================================================================================
 ;=====================================================================================
+; Extract profile name from full path
+Func _GetProfileFromFullPath($sPath)
+	Local $ProfileName
+
+	Local $Return = StringRegExp($sPath, "\" & $Title & ".([0-9a-zA-Z.-_]+).dat", 1)
+	If @error Then Return ""
+
+	Return $Return[0]
+EndFunc
+
 ; Special function to handle messages from custom GUI menu
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 		Local $Temp = _WinAPI_LoWord($wParam)
