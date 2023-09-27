@@ -187,6 +187,7 @@ While 1
 			; Set some of the GUI parameters that we don't or can't do in Koda
 			;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
 			WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
+			If $ActiveProfile <> "Default" Then WinSetTitle($SettingsForm, "", $TitleVersion & " - " & $ActiveProfile) ; Change title to include profile if not the default profile
 			GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 			_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
 			_UpdateCommandComboBox() ; Set the options in the combobox
@@ -202,8 +203,12 @@ While 1
 			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringReplace($ConfigFile, ".dat", "*.dat"), 1, True)
 			For $i = 1 To Ubound($aConfigFiles) - 1
 				$ProfileName = _GetProfileFromFullPath($aConfigFiles[$i])
+				If $ProfileName = "" Then $ProfileName = $ProfileName & "Default"
+				_ConsoleWrite("$ProfileName="&$ProfileName)
+
 				$cmdID = 1100 + $i
-				If $aConfigFiles[$i] = $ConfigFileFullPath Then $ProfileName = $ProfileName & "Default (Current Profile)"
+
+				If $ActiveProfile = $ProfileName Then $ProfileName = $ProfileName & " (Current Profile)"
 				_GUICtrlMenu_InsertMenuItem($g_hFile, -1, $ProfileName, $cmdID)
 				If $aConfigFiles[$i] = $ConfigFileFullPath Then _GUICtrlMenu_SetItemDisabled($g_hFile, $cmdID, True, False)
 			Next
