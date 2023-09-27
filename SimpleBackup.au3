@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.221
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.229
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -193,7 +193,8 @@ While 1
 
 			; Setup a custom menu
 			Global $MenuMsg = 0
-			If Not IsDeclared("ExitMenuItem") Then Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, $VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem
+			If Not IsDeclared("ExitMenuItem") Then Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, _
+				$VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem, $AboutMenuItem, $WebsiteMenuItem
 
 			; Setup file menu
 			$g_hFile = _GUICtrlMenu_CreateMenu()
@@ -221,11 +222,17 @@ While 1
 			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
 
+			; Setup help menu
+			$g_hHelp = _GUICtrlMenu_CreateMenu()
+			_GUICtrlMenu_InsertMenuItem($g_hHelp, -1, "Visit Website", $WebsiteMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hHelp, -1, "About " & $Title, $AboutMenuItem)
+
 			; Setup main menu
 			$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS))
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&File", 0, $g_hFile)
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Tools", 0, $g_hTools)
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Advanced", 0, $g_hAdvanced)
+			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Help", 0, $g_hHelp)
 
 			; Create menu
 			_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
@@ -293,13 +300,25 @@ While 1
 							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
 						EndIf
 
+					; Add missing key=value pairs to existing config
 					Case $TemplateMenuItem
 						_ForceRequiredConfig($aConfig, $SettingsTemplate)
 						GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 
+					; Open the github page
+					Case $WebsiteMenuItem
+						ShellExecute("https://github.com/jmclaren7/restic-simple-backup")
+
+					; Open a dialog with program information
+					Case $AboutMenuItem
+						MsgBox($MB_ICONINFORMATION, $TitleVersion, _
+							"Restic SimpleBackup" & @CRLF & "https://github.com/jmclaren7/restic-simple-backup" & @CRLF & "Copyright (c) 2023, John McLaren" & @CRLF & @CRLF & _
+							"Restic" & @CRLF & "https://github.com/restic/restic" & @CRLF & "Copyright (c) 2014, Alexander Neumann" & @CRLF & @CRLF & _
+							"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik")
+
+					; Create or switch profile
 					Case $NewProfileMenuItem, 1100 To 1199
-						; Create a new profile
-						_ConsoleWrite("Profile switch")
+						_ConsoleWrite("Profile create/switch")
 
 						If $nMsg=$NewProfileMenuItem Then
 							; Prompt for profile name and convert to full path
@@ -321,6 +340,7 @@ While 1
 						GUIDelete($SettingsForm)
 						ContinueLoop 2
 
+					; Start the Restic-Browser
 					Case $BrowserMenuItem
 						; Pack and unpack the Restic-Browser executable
 						DirCreate($TempDir)
@@ -347,6 +367,7 @@ While 1
 						_UpdateEnv($aConfig)
 						$ResticBrowserPid = Run($ResticBrowserFullPath)
 
+					; Create a sceduled task to run the backup
 					Case $ScheduledTaskMenuItem
 						If $ActiveProfile <> "Default" Then
 							$ProfileSwitch = " profile " & $ActiveProfile
@@ -363,9 +384,8 @@ While 1
 							MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
 						Else
 							MsgBox($MB_ICONERROR, $TitleVersion, "Error creating scheduled task.")
-							If @Compiled Then MsgBox($MB_ICONERROR, $TitleVersion, "Are you running without admin?")
+							If Not @Compiled Then MsgBox($MB_ICONERROR, $TitleVersion, "Are you running without admin?")
 						EndIf
-
 
 					; Run the command provided from the combobox
 					Case $RunButton
