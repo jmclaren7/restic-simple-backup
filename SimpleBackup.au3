@@ -663,8 +663,9 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	_ConsoleWrite("  Command: " & $Run, 3)
 	_UpdateEnv($aConfig)
-	_ConsoleWrite("  _RunWait", 2)
+	_ConsoleWrite("  Working Repository: " & EnvGet("RESTIC_REPOSITORY"), 1)
 
+	_ConsoleWrite("  _RunWait", 2)
 	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
 	Local $Return = _RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
 	_UpdateEnv($aConfig, True) ; Remove env values
