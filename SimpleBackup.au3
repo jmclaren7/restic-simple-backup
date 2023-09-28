@@ -464,12 +464,12 @@ Wend
 ;=====================================================================================
 ; Extract profile name from full path
 Func _GetProfileFromFullPath($sPath)
-	Local $ProfileName
-
-	Local $Return = StringRegExp($sPath, "\" & $Title & ".([0-9a-zA-Z.-_]+).dat", 1)
-	If @error Then Return ""
-
-	Return $Return[0]
+	Local $Return = StringRegExp($sPath, "\" & $Title & ".([0-9a-zA-Z.-_ ]+).dat", 1)
+	If @error Then
+		Return ""
+	Else
+		Return $Return[0]
+	EndIf
 EndFunc
 
 ; Special function to handle messages from custom GUI menu
