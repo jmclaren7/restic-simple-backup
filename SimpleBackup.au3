@@ -339,6 +339,7 @@ While 1
 						_ConsoleWrite("$ConfigFileFullPath=" & $ConfigFileFullPath, 3)
 
 						$ActiveProfile = _GetProfileFromFullPath($ConfigFileFullPath)
+
 						_ConsoleWrite("$ActiveProfile=" & $ActiveProfile, 3)
 
 						; Delete the GUI and restart
@@ -532,7 +533,7 @@ Func _UpdateEnv($aArray, $Delete = Default)
 
 	Local $aInternalSettings = StringSplit($InternalSettings, "|")
 
-	; Loop array and combine key=value pairs
+	; Loop array and set or delete Env
 	For $i=1 To $aArray[0][0]
 		; Skip If the value is a comment, empty or internal
 		If StringLeft($aArray[$i][0], 1) = "#" Then ContinueLoop
@@ -623,7 +624,7 @@ Func _ArrayToConfig($aArray)
 	Return $ConfigData
 EndFunc
 
-; Read and decrypt the config file then load it to internal variables
+; Read and decrypt the config file
 Func _ReadConfig()
 	_ConsoleWrite("_ReadConfig", 3)
 
@@ -635,7 +636,7 @@ Func _ReadConfig()
 	Return $ConfigData
 EndFunc
 
-; Convert internal variables to string, encrypt and write the config file
+; Encrypt and write the config file
 Func _WriteConfig($ConfigData)
 	_ConsoleWrite("_WriteConfig", 3)
 
