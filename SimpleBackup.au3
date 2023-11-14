@@ -677,6 +677,8 @@ EndFunc
 Func _Exit()
 	_ConsoleWrite("_Exit", 3)
 
+	GUIDelete($SettingsForm)
+
 	; Close any instance of restic-browser
 	If IsDeclared("ResticBrowserPid") Then ProcessClose($ResticBrowserPid)
 	ProcessClose("Restic-Browser.exe")
