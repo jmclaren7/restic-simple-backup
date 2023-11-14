@@ -30,7 +30,7 @@
 #include <GuiMenu.au3>
 #include <WindowsConstants.au3>
 
-; https://github.com/jmclaren7/AutoITScripts/blob/master/CommonFunctions.au3
+; https://github.com/jmclaren7/autoit-scripts/blob/master/CommonFunctions.au3
 #include <include\External.au3>
 
 ; Setup Logging For _ConsoleWrite
@@ -204,7 +204,7 @@ While 1
 			For $i = 1 To Ubound($aConfigFiles) - 1
 				$ProfileName = _GetProfileFromFullPath($aConfigFiles[$i])
 				If $ProfileName = "" Then $ProfileName = $ProfileName & "Default"
-				_ConsoleWrite("$ProfileName="&$ProfileName)
+				_ConsoleWrite("Found profile: "&$ProfileName)
 
 				$cmdID = 1100 + $i
 
