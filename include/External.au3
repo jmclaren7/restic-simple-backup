@@ -18,13 +18,13 @@ Func _RunWait($sProgram, $Working = "", $Show = @SW_HIDE, $Opt = $STDERR_MERGED,
 	$iPid = Run($sProgram, $Working, $Show, $Opt)
 	If @error Then
 		_ConsoleWrite("_RunWait: Couldn't Run " & $sProgram)
-		return SetError(1, 0, 0)
-	endif
+		Return SetError(1, 0, 0)
+	EndIf
 
 	$sData = _ProcessWaitClose($iPid, $Live)
 
-	return SetError(0, $iPid, $sData)
-endfunc
+	Return SetError(0, $iPid, $sData)
+EndFunc   ;==>_RunWait
 ;===============================================================================
 ; Function Name:    _ProcessWaitClose
 ; Description:		ProcessWaitClose that handles stdout from the running process
@@ -43,30 +43,29 @@ Func _ProcessWaitClose($iPid, $Live = False, $Diag = False)
 		$sStdRead = StdoutRead($iPid)
 		If @error Or $sStdRead = "" Then StderrRead($iPid)
 		If @error And Not ProcessExists($iPid) Then ExitLoop
-		$sStdRead = StringReplace($sStdRead, @CR&@LF&@CR&@LF, @CR&@LF)
+		$sStdRead = StringReplace($sStdRead, @CR & @LF & @CR & @LF, @CR & @LF)
 
 		If $Diag Then
-			$sStdRead = StringReplace($sStdRead, @CRLF, "@CRLF")
-			$sStdRead = StringReplace($sStdRead, @CR, "@CR"&@CR)
-			$sStdRead = StringReplace($sStdRead, @LF, "@LF"&@LF)
-			$sStdRead = StringReplace($sStdRead, "@CRLF", "@CRLF"&@CRLF)
+			$sStdRead = StringReplace($sStdRead, @CRLF, "_@CRLF")
+			$sStdRead = StringReplace($sStdRead, @CR, "@CR" & @CR)
+			$sStdRead = StringReplace($sStdRead, @LF, "@LF" & @LF)
+			$sStdRead = StringReplace($sStdRead, "_@CRLF", "@CRLF" & @CRLF)
 		EndIf
 
 		If $sStdRead <> @CRLF Then
 			$sData &= $sStdRead
 			If $Live And $sStdRead <> "" Then
 				If StringRight($sStdRead, 2) = @CRLF Then $sStdRead = StringTrimRight($sStdRead, 2)
-				;If StringRight($sStdRead, 1) = @CR Then $sStdRead = StringTrimRight($sStdRead, 1) ; This may never be needed, leaving disabled
 				If StringRight($sStdRead, 1) = @LF Then $sStdRead = StringTrimRight($sStdRead, 1)
 				_ConsoleWrite($sStdRead)
-			Endif
-		Endif
+			EndIf
+		EndIf
 
 		Sleep(5)
 	WEnd
 
-	return $sData
-endfunc
+	Return $sData
+EndFunc   ;==>_ProcessWaitClose
 ;===============================================================================
 ; Function Name:   	_ConsoleWrite()
 ; Description:		Console & File Loging
@@ -128,6 +127,7 @@ Func _ConsoleWrite($sMessage, $iLevel = 1, $iSameLine = 0)
 
 	Return $sMessage
 EndFunc ;==> _ConsoleWrite
+
 ;===============================================================================
 ; Function Name:    _KeyValue()
 ; Description:		Work with 2d arrays treated as key value pairs such as the ones produced by INIReadSection()
@@ -205,41 +205,68 @@ Func _KeyValue(ByRef $aArray, $Key, $Value = Default, $Delete = Default)
 	Return ""
 EndFunc ;==>_KeyValue
 
-Func _INetSmtpMailCom($s_SmtpServer, $s_FromName, $s_FromAddress, $s_ToAddress, $s_Subject = "", $as_Body = "", $s_Username = "", $s_Password = "", $s_CcAddress = "", $s_BccAddress = "", $IPPort = 587, $ssl = 0, $tls = True)
-    Local $objEmail = ObjCreate("CDO.Message")
-    $objEmail.From = '"' & $s_FromName & '" <' & $s_FromAddress & '>'
-    $objEmail.To = $s_ToAddress
-    Local $i_Error = 0
-    Local $i_Error_desciption = ""
-    If $s_CcAddress <> "" Then $objEmail.Cc = $s_CcAddress
-    If $s_BccAddress <> "" Then $objEmail.Bcc = $s_BccAddress
-    $objEmail.Subject = $s_Subject
-    If StringInStr($as_Body, "<") And StringInStr($as_Body, ">") Then
-        $objEmail.HTMLBody = $as_Body
-    Else
-        $objEmail.Textbody = $as_Body & @CRLF
-    EndIf
-    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
-    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserver") = $s_SmtpServer
-    If Number($IPPort) = 0 then $IPPort = 25
-    $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = $IPPort
-    ;Authenticated SMTP
-    If $s_Username <> "" Then
-        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = 1
-        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendusername") = $s_Username
-        $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendpassword") = $s_Password
-    EndIf
-    ; Set security params
-    If $ssl Then $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = True
-    If $tls Then $objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendtls") = True
-    ;Update settings
-    $objEmail.Configuration.Fields.Update
-    $objEmail.Fields.Update
-    ; Sent the Message
-    $objEmail.Send
-    If @error Then
-        SetError(2)
-        Return 0
-    EndIf
-    $objEmail=""
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _INetSmtpMailCom
+; Description ...: Send an email using a Windows API with authentication and encryption which isn't available in the AutoIt UDF _INetSmtpMail
+; Syntax ........: _INetSmtpMailCom($sSMTPServer, $sFromName, $sFromAddress, $sToAddress[, $sSubject = ""[, $sBody = ""[,
+;                  $sUsername = ""[, $sPassword = ""[, $sCCAddress = ""[, $sBCCAddress = ""[, $iPort = 587[, $bSSL = False[,
+;                  $bTLS = True]]]]]]]]])
+; Parameters ....: $sSMTPServer         - a string value.
+;                  $sFromName           - a string value.
+;                  $sFromAddress        - a string value.
+;                  $sToAddress          - a string value.
+;                  $sSubject            - [optional] a string value. Default is "".
+;                  $sBody               - [optional] a string value. Default is "".
+;                  $sUsername           - [optional] a string value. Default is "".
+;                  $sPassword           - [optional] a string value. Default is "".
+;                  $sCCAddress          - [optional] a string value. Default is "".
+;                  $sBCCAddress         - [optional] a string value. Default is "".
+;                  $iPort               - [optional] an integer value. Default is 587.
+;                  $bSSL                - [optional] a boolean value. Default is False.
+;                  $bTLS                - [optional] a boolean value. Default is True.
+; Return values .: None
+; Author ........: AutoIT Forum, modified by JohnMC - JohnsCS.com
+; Date/Version ..: 11/15/2023  --  v1.1
+; ===============================================================================================================================
+Func _INetSmtpMailCom($sSMTPServer, $sFromName, $sFromAddress, $sToAddress, $sSubject = "", $sBody = "", $sUsername = "", $sPassword = "", $sCCAddress = "", $sBCCAddress = "", $iPort = 587, $bSSL = False, $bTLS = True)
+	Local $oMail = ObjCreate("CDO.Message")
+
+	$oMail.From = '"' & $sFromName & '" <' & $sFromAddress & '>'
+	$oMail.To = $sToAddress
+	$oMail.Subject = $sSubject
+
+	If $sCCAddress Then $oMail.Cc = $sCCAddress
+	If $sBCCAddress Then $oMail.Bcc = $sBCCAddress
+
+	If StringInStr($sBody, "<") And StringInStr($sBody, ">") Then
+		$oMail.HTMLBody = $sBody
+	Else
+		$oMail.Textbody = $sBody & @CRLF
+	EndIf
+
+	$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
+	$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/smtpserver") = $sSMTPServer
+	$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = $iPort
+
+	; Authenticated SMTP
+	If $sUsername <> "" Then
+		$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = 1
+		$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/sendusername") = $sUsername
+		$oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/sendpassword") = $sPassword
+	EndIf
+
+	; Set security parameters
+	If $bSSL Then $oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = True
+	If $bTLS Then $oMail.Configuration.Fields.Item("http://schemas.microsoft.com/cdo/configuration/sendtls") = True
+
+	; Update settings
+	$oMail.Configuration.Fields.Update
+	$oMail.Fields.Update
+
+	; Send the Message
+	$oMail.Send
+	If @error Then Return SetError(2, 0, 0)
+
+	$oMail = ""
+
 EndFunc   ;==>_INetSmtpMailCom
