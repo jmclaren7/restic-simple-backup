@@ -356,6 +356,7 @@ While 1
 						DirCreate($TempDir)
 						If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
 							_ConsoleWrite("FileInstall error")
+							Msgbox(16, $Title, "Error unpacking program")
 							Exit
 						Endif
 
@@ -370,6 +371,7 @@ While 1
 						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
 						If $Hash <> $ResticBrowserHash Then
 							_ConsoleWrite("Hash error - " & $Hash)
+							Msgbox(16, $Title, "Error starting program")
 							Exit
 						EndIf
 
@@ -661,6 +663,7 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	If $Hash <> $ResticHash Then
 		_ConsoleWrite("Hash error - " & $Hash)
+		Msgbox(16, $Title, "Error starting program")
 		Exit
 	EndIf
 
