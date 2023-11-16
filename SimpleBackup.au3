@@ -247,6 +247,10 @@ While 1
 			If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 			GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
+			; CTRL+S will work as apply button
+			Dim $aAccelKeys[1][2] = [["^s", $ApplyButton]]
+			GUISetAccelerators($aAccelKeys)
+
 			; GUI loop
 			While 1
 				$nMsg = GUIGetMsg()
