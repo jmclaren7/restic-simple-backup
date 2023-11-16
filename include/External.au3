@@ -1,6 +1,6 @@
 #include-once
 #include <AutoItConstants.au3>
-#Include <String.au3>
+#include <String.au3>
 
 ;===============================================================================
 ; Function Name:    _RunWait
@@ -85,48 +85,48 @@ EndFunc   ;==>_ProcessWaitClose
 Func _ConsoleWrite($sMessage, $iLevel = 1, $iSameLine = 0)
 	Local $hHandle, $sData
 
-	if Eval("LogFilePath") = "" Then Global $LogFilePath = StringTrimRight(@ScriptFullPath,4)&"_Log.txt"
-	if Eval("LogFileMaxSize") = "" Then Global $LogFileMaxSize = 0
-	if Eval("LogToFile") = "" Then Global $LogToFile = False
-	if StringInStr($CmdLineRaw, "-debuglog") Then Global $LogToFile = True
-	if Eval("LogLevel") = "" Then Global $LogLevel = 3 ; The level of message to log - If no level set to 3
+	If Eval("LogFilePath") = "" Then Global $LogFilePath = StringTrimRight(@ScriptFullPath, 4) & "_Log.txt"
+	If Eval("LogFileMaxSize") = "" Then Global $LogFileMaxSize = 0
+	If Eval("LogToFile") = "" Then Global $LogToFile = False
+	If StringInStr($CmdLineRaw, "-debuglog") Then Global $LogToFile = True
+	If Eval("LogLevel") = "" Then Global $LogLevel = 3 ; The level of message to log - If no level set to 3
 
 	If $sMessage == "OPENLOG" Then Return ShellExecute($LogFilePath)
 
-	If $iLevel<=$LogLevel then
-		$sMessage=StringReplace($sMessage,@CRLF&@CRLF,@CRLF) ;Remove Double CR
-		If StringRight($sMessage,StringLen(@CRLF))=@CRLF Then $sMessage=StringTrimRight($sMessage,StringLen(@CRLF)) ; Remove last CR
+	If $iLevel <= $LogLevel Then
+		$sMessage = StringReplace($sMessage, @CRLF & @CRLF, @CRLF) ;Remove Double CR
+		If StringRight($sMessage, StringLen(@CRLF)) = @CRLF Then $sMessage = StringTrimRight($sMessage, StringLen(@CRLF)) ; Remove last CR
 
 		; Generate Timestamp
-		Local $sTime=@YEAR&"-"&@MON&"-"&@MDAY&" "&@HOUR&":"&@MIN&":"&@SEC&"> "
+		Local $sTime = @YEAR & "-" & @MON & "-" & @MDAY & " " & @HOUR & ":" & @MIN & ":" & @SEC & "> "
 
 		; Force CRLF
 		$sMessage = StringRegExpReplace($sMessage, "((?<!\x0d)\x0a|\x0d(?!\x0a))", @CRLF)
 
 		; Adds spaces for alignment after initial line
-		$sMessage=StringReplace($sMessage,@CRLF,@CRLF&_StringRepeat(" ",StringLen($sTime)))
+		$sMessage = StringReplace($sMessage, @CRLF, @CRLF & _StringRepeat(" ", StringLen($sTime)))
 
-		If $iSameLine=0 then $sMessage=@CRLF&$sTime&$sMessage
-		If $iSameLine=2 then $sMessage=@CR&$sTime&$sMessage
+		If $iSameLine = 0 Then $sMessage = @CRLF & $sTime & $sMessage
+		If $iSameLine = 2 Then $sMessage = @CR & $sTime & $sMessage
 
 		ConsoleWrite($sMessage)
 
 		If $LogToFile Then
-			if $LogFileMaxSize<>0 AND FileGetSize($LogFilePath) > $LogFileMaxSize*1024 then
-				$sMessage=FileRead($LogFilePath) & $sMessage
-				$sMessage=StringTrimLeft($sMessage,StringInStr($sMessage, @CRLF, 0, 5))
-				$hHandle=FileOpen($LogFilePath,2)
+			If $LogFileMaxSize <> 0 And FileGetSize($LogFilePath) > $LogFileMaxSize * 1024 Then
+				$sMessage = FileRead($LogFilePath) & $sMessage
+				$sMessage = StringTrimLeft($sMessage, StringInStr($sMessage, @CRLF, 0, 5))
+				$hHandle = FileOpen($LogFilePath, 2)
 			Else
-				$hHandle=FileOpen($LogFilePath,1)
-			endif
-			FileWrite($hHandle,$sMessage)
+				$hHandle = FileOpen($LogFilePath, 1)
+			EndIf
+			FileWrite($hHandle, $sMessage)
 			FileClose($hHandle)
 
-		endif
-	endif
+		EndIf
+	EndIf
 
 	Return $sMessage
-EndFunc ;==> _ConsoleWrite
+EndFunc   ;==>_ConsoleWrite
 
 ;===============================================================================
 ; Function Name:    _KeyValue()
@@ -160,7 +160,7 @@ Func _KeyValue(ByRef $aArray, $Key, $Value = Default, $Delete = Default)
 			If $Value = Default Then
 				Return $aArray[$i][1]
 
-			; Update existing value
+				; Update existing value
 			Else
 				$aArray[$i][1] = $Value
 				$aArray[0][0] = UBound($aArray) - 1
@@ -198,12 +198,12 @@ Func _KeyValue(ByRef $aArray, $Key, $Value = Default, $Delete = Default)
 		$aArray[0][0] = UBound($aArray) - 1
 
 		Return $Value
-	endif
+	EndIf
 
 	; Return error because a key doesn't exist and nothing else to do
 	SetError(1)
 	Return ""
-EndFunc ;==>_KeyValue
+EndFunc   ;==>_KeyValue
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _INetSmtpMailCom
