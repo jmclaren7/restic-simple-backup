@@ -63,8 +63,10 @@ Global $ActiveProfile = "Default"
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These hashes are used to verify the binaries right before they run
-Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c"
-Global $ResticBrowserHash = "0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
+Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c" & _
+						"0x" & ""
+Global $ResticBrowserHash = "0x" & "1d43ef34a4ff29e9e8fbb677c091fa4bed03faae" & _
+							"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
@@ -369,7 +371,7 @@ While 1
 
 						; Verify the hash of the restic-browser.exe
 						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
-						If $Hash <> $ResticBrowserHash Then
+						If Not StringInStr($ResticBrowserHash, $Hash) Then
 							_ConsoleWrite("Hash error - " & $Hash)
 							Msgbox(16, $Title, "Error starting program")
 							Exit
@@ -661,7 +663,7 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
 
-	If $Hash <> $ResticHash Then
+	If Not StringInStr($ResticHash, $Hash) Then
 		_ConsoleWrite("Hash error - " & $Hash)
 		Msgbox(16, $Title, "Error starting program")
 		Exit
