@@ -1,5 +1,5 @@
 # Restic SimpleBackup
-This AutoIT script helps with the configuration and operation of Restic backup. Some parameters are simply passed to Restic, you can find more information about Restic [here](https://restic.readthedocs.io/en/stable/).
+This AutoIT script helps with the configuration and operation of Restic backup. Some parameters are simply passed to Restic, you can find more information about Restic in the official Restic documentation [here](https://restic.readthedocs.io/en/stable/).
 
 <p align="center">
   <img src="https://github.com/jmclaren7/restic-simple-backup/blob/main/extra/main-window.jpg?raw=true">
@@ -7,12 +7,12 @@ This AutoIT script helps with the configuration and operation of Restic backup. 
 
 ## Features
 * Configuration GUI
-* Single executable - Integrates Restic.exe
-* Integrated Restic-Browser to explore and restore from backups
+* Single executable - Integrates [Restic.exe](https://github.com/restic/restic)
+* Integrated [Restic-Browser.exe](https://github.com/emuell/restic-browser) to explore and restore from backups
 * Uses the same enviromental variables from Restic
 * Create a scheduled task from GUI
 * Multiple backup profiles for seperate backup tasks
-* Send email with backup status
+* Send status email using SMTP
 
 ## SimpleBackup Setup
 1. Download the latest SimpleBackup.exe from the releases page
