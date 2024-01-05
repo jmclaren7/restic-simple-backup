@@ -62,11 +62,12 @@ Global $ActiveProfile = "Default"
 ; This value changes depending on program contexts to give us the most aplicable output
 Global $RunSTDIO = $STDERR_MERGED
 
-; These hashes are used to verify the binaries right before they run
+; These SHA1 hashes are used to verify the binaries right before they run
 Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c" & _
 						"0x" & ""
 Global $ResticBrowserHash = "0x" & "1d43ef34a4ff29e9e8fbb677c091fa4bed03faae" & _
-							"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65"
+							"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65" & _
+							"0x" & "a487bb15ae091c68ac554614226895055fca4a38"
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
@@ -356,7 +357,7 @@ While 1
 					Case $BrowserMenuItem
 						; Pack and unpack the Restic-Browser executable
 						DirCreate($TempDir)
-						If FileInstall("include\Restic-Browser-Self.exe", $ResticBrowserFullPath, 1) = 0 Then
+						If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
 							_ConsoleWrite("FileInstall error")
 							Msgbox(16, $Title, "Error unpacking program")
 							Exit
