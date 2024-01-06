@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.236
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.239
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -61,11 +61,11 @@ Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the binaries right before they run
-Global $ResticHash = "0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c" & _
-						"0x" & ""
-Global $ResticBrowserHash = "0x" & "1d43ef34a4ff29e9e8fbb677c091fa4bed03faae" & _
-							"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65" & _
-							"0x" & "a487bb15ae091c68ac554614226895055fca4a38"
+Global $SafeHash = 	"0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c" & _
+					"0x" & "a70990f521a005914ba2638575ef5f1463eb287f" & _
+					"0x" & "1d43ef34a4ff29e9e8fbb677c091fa4bed03faae" & _
+					"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65" & _
+					"0x" & "a487bb15ae091c68ac554614226895055fca4a38"
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
@@ -367,7 +367,7 @@ While 1
 
 						; Verify the hash of the restic-browser.exe
 						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
-						If Not StringInStr($ResticBrowserHash, $Hash) Then
+						If Not StringInStr($SafeHash, $Hash) Then
 							_ConsoleWrite("Hash error - " & $Hash)
 							Msgbox(16, $Title, "Error starting program")
 							Exit
@@ -674,7 +674,7 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
 
-	If Not StringInStr($ResticHash, $Hash) Then
+	If Not StringInStr($SafeHash, $Hash) Then
 		_ConsoleWrite("Hash error - " & $Hash)
 		Msgbox(16, $Title, "Error starting program")
 		Exit
