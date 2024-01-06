@@ -54,9 +54,7 @@ Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP
 Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
 Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
-Global $ConfigFile = StringTrimRight(@ScriptName, 4) & ".dat"
-Global $ConfigFileFullPath = @ScriptDir & "\" & $ConfigFile
-Global $ActiveProfile = "Default"
+Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 
 ; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
 ; This value changes depending on program contexts to give us the most aplicable output
@@ -90,9 +88,8 @@ For $i = 1 To $CmdLine[0]
 		Case "profile"
 			; The profile parameter and the following parameter are used to adjust the
 			$i = $i + 1
-			$ConfigFileFullPath = StringTrimRight($ConfigFileFullPath, 4) & "." & $CmdLine[$i] & ".dat"
-			$ActiveProfile = $CmdLine[$i]
-			_ConsoleWrite("Config file is now " & StringTrimLeft($ConfigFileFullPath, StringInStr($ConfigFileFullPath, "\", 0, -1)))
+			$ActiveConfigFileFullPath = _GetProfileFullPath($CmdLine[$i])
+			_ConsoleWrite("Config file is now " & $ActiveConfigFileFullPath)
 
 		Case Else
 			; The first parameter not specialy handled must be the command
@@ -188,9 +185,8 @@ While 1
 			#EndRegion ### END Koda GUI section ###
 
 			; Set some of the GUI parameters that we don't or can't do in Koda
-			;WinMove($SettingsForm, "", Default, Default, 600, 450) ; Resize the window
 			WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
-			If $ActiveProfile <> "Default" Then WinSetTitle($SettingsForm, "", $TitleVersion & " - " & $ActiveProfile) ; Change title to include profile if not the default profile
+			If _GetProfileName() <> "Default" Then WinSetTitle($SettingsForm, "", $TitleVersion & " - " & _GetProfileName()) ; Change title to include profile if not the default profile
 			GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
 			_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
 			_UpdateCommandComboBox() ; Set the options in the combobox
@@ -203,17 +199,21 @@ While 1
 			; Setup file menu
 			$g_hFile = _GUICtrlMenu_CreateMenu()
 			; Create menu items based on config files found
-			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringReplace($ConfigFile, ".dat", "*.dat"), 1, True)
+			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringTrimRight(@ScriptName, 4) & "*.dat", 1, True)
 			For $i = 1 To Ubound($aConfigFiles) - 1
-				$ProfileName = _GetProfileFromFullPath($aConfigFiles[$i])
-				If $ProfileName = "" Then $ProfileName = $ProfileName & "Default"
-				_ConsoleWrite("Found profile: "&$ProfileName)
+				$ThisProfileName = _GetProfileName($aConfigFiles[$i])
+				_ConsoleWrite("Found profile: " & $ThisProfileName)
 
 				$cmdID = 1100 + $i
 
-				If $ActiveProfile = $ProfileName Then $ProfileName = $ProfileName & " (Current Profile)"
-				_GUICtrlMenu_InsertMenuItem($g_hFile, -1, $ProfileName, $cmdID)
-				If $aConfigFiles[$i] = $ConfigFileFullPath Then _GUICtrlMenu_SetItemDisabled($g_hFile, $cmdID, True, False)
+				; If this menu item is for the active config then add text to let user know
+				If $aConfigFiles[$i] = $ActiveConfigFileFullPath Then $ThisProfileName = $ThisProfileName & " (Current Profile)"
+
+				; Create the menu item for the profile
+				_GUICtrlMenu_InsertMenuItem($g_hFile, -1, $ThisProfileName, $cmdID)
+
+				; If this menu item is for the active config then disable clicking on it
+				If $aConfigFiles[$i] = $ActiveConfigFileFullPath Then _GUICtrlMenu_SetItemDisabled($g_hFile, $cmdID, True, False)
 			Next
 			_GUICtrlMenu_InsertMenuItem($g_hFile, -1, "New Profile/Config...", $NewProfileMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hFile, -1, "")
@@ -221,7 +221,7 @@ While 1
 
 			; Setup tools menu
 			$g_hTools = _GUICtrlMenu_CreateMenu()
-			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task (Profile: " & $ActiveProfile & ")", $ScheduledTaskMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task (Profile: " & _GetProfileName() & ")", $ScheduledTaskMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Open Restic Browser", $BrowserMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Add Missing Configuration Options From Template", $TemplateMenuItem)
 
@@ -332,22 +332,17 @@ While 1
 					Case $NewProfileMenuItem, 1100 To 1199
 						_ConsoleWrite("Profile create/switch")
 
-						If $nMsg=$NewProfileMenuItem Then
-							; Prompt for profile name and convert to full path
-							; If the profile name already exists the existing profile will load and wont be overwriten unless the user does so
+						If $nMsg = $NewProfileMenuItem Then
+							; Prompt for profile name, if the profile name already exists it will be loaded
 							$NewProfile = InputBox($TitleVersion, "Enter a name for the new profile/config", "", "", Default, 130)
 							If @error Then ContinueLoop
-							$ConfigFileFullPath = StringTrimRight($ConfigFileFullPath, 4) & "." & $NewProfile & ".dat"
+							$ActiveConfigFileFullPath = _GetProfileFullPath($NewProfile)
 						Else
-							$ConfigFileFullPath = $aConfigFiles[$nMsg - 1100]
+							$ActiveConfigFileFullPath = $aConfigFiles[$nMsg - 1100]
 
 						Endif
 
-						_ConsoleWrite("$ConfigFileFullPath=" & $ConfigFileFullPath, 3)
-
-						$ActiveProfile = _GetProfileFromFullPath($ConfigFileFullPath)
-
-						_ConsoleWrite("$ActiveProfile=" & $ActiveProfile, 3)
+						_ConsoleWrite("$ActiveConfigFileFullPath=" & $ActiveConfigFileFullPath, 3)
 
 						; Delete the GUI and restart
 						GUIDelete($SettingsForm)
@@ -384,9 +379,9 @@ While 1
 
 					; Create a sceduled task to run the backup
 					Case $ScheduledTaskMenuItem
-						If $ActiveProfile <> "Default" Then
-							$ProfileSwitch = " profile " & $ActiveProfile
-							$TaskName = "." & $ActiveProfile
+						If _GetProfileName() <> "Default" Then
+							$ProfileSwitch = " profile " & _GetProfileName()
+							$TaskName = "." & _GetProfileName()
 						Else
 							$ProfileSwitch = ""
 							$TaskName = ""
@@ -473,14 +468,29 @@ Wend
 ;=====================================================================================
 ;=====================================================================================
 ; Extract profile name from full path
-Func _GetProfileFromFullPath($sPath)
+Func _GetProfileName($sPath = Default)
+	If $sPath = Default Then $sPath = $ActiveConfigFileFullPath
+
 	Local $Return = StringRegExp($sPath, "\" & $Title & ".([0-9a-zA-Z.\-_ ]+).dat", 1)
+
 	If @error Then
 		Return "Default"
 	Else
 		Return $Return[0]
 	EndIf
 EndFunc
+
+Func _GetProfileFullPath($sProfile = Default)
+	If $sProfile = Default Then
+		$sProfile = ""
+	Else
+		$sProfile = "." & $sProfile
+	EndIf
+
+	Return StringTrimRight(@ScriptFullPath, 4) & $sProfile & ".dat"
+
+EndFunc
+
 
 ; Special function to handle messages from custom GUI menu
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
@@ -637,7 +647,7 @@ EndFunc
 Func _ReadConfig()
 	_ConsoleWrite("_ReadConfig", 3)
 
-	Local $ConfigData = FileRead($ConfigFileFullPath)
+	Local $ConfigData = FileRead($ActiveConfigFileFullPath)
 
 	; Decypt Data Here
 	$ConfigData = BinaryToString(_Crypt_DecryptData($ConfigData, $HwKey, $CALG_AES_256))
@@ -652,7 +662,7 @@ Func _WriteConfig($ConfigData)
 	; Encrypt
 	$ConfigData = _Crypt_EncryptData($ConfigData, $HwKey, $CALG_AES_256)
 
-	$hConfigFile = FileOpen($ConfigFileFullPath, 2)
+	$hConfigFile = FileOpen($ActiveConfigFileFullPath, 2)
 	FileWrite($hConfigFile, $ConfigData)
 
 	Return
