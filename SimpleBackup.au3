@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.239
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.242
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -60,12 +60,9 @@ Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 ; This value changes depending on program contexts to give us the most aplicable output
 Global $RunSTDIO = $STDERR_MERGED
 
-; These SHA1 hashes are used to verify the binaries right before they run
-Global $SafeHash = 	"0x" & "dab3472f534e127b05b5c21e8edf2b8e0b79ae1c" & _
-					"0x" & "a70990f521a005914ba2638575ef5f1463eb287f" & _
-					"0x" & "1d43ef34a4ff29e9e8fbb677c091fa4bed03faae" & _
-					"0x" & "6b6634710ff5011ace07666de838ad5c272e3d65" & _
-					"0x" & "a487bb15ae091c68ac554614226895055fca4a38"
+; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
+Global $SafeHash = 	"0x" & "21aed93181e5e31a58b4d052de86f48643bdef7d" & _
+					"0x" & "4967a6eae81fc6b597e26b0ec8219a0f42a420f5"
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
