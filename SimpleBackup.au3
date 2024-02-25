@@ -1,19 +1,19 @@
-#NoTrayIcon
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=include\SimpleBackup.ico
+#AutoIt3Wrapper_Compression=4
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.242
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.260
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
 #AutoIt3Wrapper_Res_Language=1033
-#AutoIt3Wrapper_Res_requestedExecutionLevel=highestAvailable
+#AutoIt3Wrapper_Run_Au3Stripper=y
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
-; Testing only, uncomment this to run as admin when running uncompiled
-;#RequireAdmin
+#NoTrayIcon
+#RequireAdmin
 
 #include <Array.au3>
 #include <File.au3>
@@ -23,7 +23,6 @@
 #include <Crypt.au3>
 #include <WinAPIDiag.au3>
 #include <WinAPIConv.au3>
-#include <Inet.au3>
 #include <GUIConstantsEx.au3>
 #include <GuiComboBox.au3>
 #include <GuiEdit.au3>
@@ -34,7 +33,7 @@
 #include <include\External.au3>
 
 ; Setup Logging For _ConsoleWrite
-Global $LogToFile = 1
+Global $LogToFile = 0
 Global $LogFileMaxSize = 512
 Global $LogLevel = 1
 If Not @Compiled Then $LogLevel = 3
@@ -70,12 +69,7 @@ Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive &
 ; Register our exit function for cleanup
 OnAutoItExitRegister("_Exit")
 
-; Pack and unpack the Restic executable
-DirCreate($TempDir)
-If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
-	_ConsoleWrite("FileInstall error")
-	Exit
-Endif
+
 
 ; Interpret command line parameters
 $Command = Default
@@ -464,7 +458,7 @@ Wend
 
 ;=====================================================================================
 ;=====================================================================================
-; Extract profile name from full path
+; Extract profile name from profile path
 Func _GetProfileName($sPath = Default)
 	If $sPath = Default Then $sPath = $ActiveConfigFileFullPath
 
@@ -477,6 +471,7 @@ Func _GetProfileName($sPath = Default)
 	EndIf
 EndFunc
 
+; Construct profile path from profile name
 Func _GetProfileFullPath($sProfile = Default)
 	If $sProfile = Default Then
 		$sProfile = ""
@@ -487,7 +482,6 @@ Func _GetProfileFullPath($sProfile = Default)
 	Return StringTrimRight(@ScriptFullPath, 4) & $sProfile & ".dat"
 
 EndFunc
-
 
 ; Special function to handle messages from custom GUI menu
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
@@ -669,14 +663,22 @@ EndFunc
 Func _Restic($Command, $Opt = $RunSTDIO)
 	_ConsoleWrite("_Restic", 3)
 
-	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
+	; Pack and unpack the Restic executable
+	DirCreate($TempDir)
+	If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
+		_ConsoleWrite("FileInstall error")
+		Exit
+	Endif
 
+	; Verify the hash of the Restic executable
+	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
 	If Not StringInStr($SafeHash, $Hash) Then
 		_ConsoleWrite("Hash error - " & $Hash)
 		Msgbox(16, $Title, "Error starting program")
 		Exit
 	EndIf
 
+	; Execute the restic command
 	Local $Run = $ResticFullPath & " " & $Command
 
 	_ConsoleWrite("  Command: " & $Run, 3)
@@ -691,6 +693,7 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 	Return $Return
 EndFunc
 
+; Do cleanup on script exit
 Func _Exit()
 	_ConsoleWrite("_Exit", 3)
 
@@ -703,11 +706,13 @@ Func _Exit()
 	; Delete any temp folders we ever created
 	Local $sPath = @TempDir & "\"
 	Local $aList = _FileListToArray($sPath, "sbr*.tmp", 2)
-	For $i = 1 To $aList[0]
-		$RemovePath = $sPath & $aList[$i]
-		DirRemove($RemovePath, 1)
-		_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")", 3)
-	Next
+	If Not @error Then
+		For $i = 1 To $aList[0]
+			$RemovePath = $sPath & $aList[$i]
+			DirRemove($RemovePath, 1)
+			_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")", 3)
+		Next
+	EndIf
 
 	_ConsoleWrite("  Cleanup Done, Exiting Program")
 EndFunc
