@@ -4,16 +4,17 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.260
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.262
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
 #AutoIt3Wrapper_Res_Language=1033
+#AutoIt3Wrapper_Res_requestedExecutionLevel=highestAvailable
 #AutoIt3Wrapper_Run_Au3Stripper=y
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #NoTrayIcon
-#RequireAdmin
+;#RequireAdmin
 
 #include <Array.au3>
 #include <File.au3>
@@ -348,6 +349,9 @@ While 1
 							Msgbox(16, $Title, "Error unpacking program")
 							Exit
 						Endif
+
+						; Run a dummy restic command to unpack the restic executable
+						_Restic("version")
 
 						; Update PATH env so that Restic-browser.exe can start restic.exe
 						$EnvPath = EnvGet("Path")
