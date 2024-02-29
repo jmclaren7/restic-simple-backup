@@ -1,5 +1,5 @@
 # Restic SimpleBackup
-This AutoIT script helps with the configuration and operation of Restic backup. Some parameters are simply passed to Restic, you can find more information about Restic in the official Restic documentation [here](https://restic.readthedocs.io/en/stable/).
+This AutoIT script helps with the configuration and operation of Restic backup on Windows. Some parameters are simply passed to Restic, you can find more information about Restic in the official Restic documentation [here](https://restic.readthedocs.io/en/stable/).
 
 <p align="center">
   <img src="https://github.com/jmclaren7/restic-simple-backup/blob/main/extra/main-window.jpg?raw=true">
