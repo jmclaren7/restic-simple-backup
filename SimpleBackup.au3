@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.262
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.264
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -61,10 +61,10 @@ Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
-Global $SafeHash = 	"0x" & "21aed93181e5e31a58b4d052de86f48643bdef7d" & _
-					"0x" & "4967a6eae81fc6b597e26b0ec8219a0f42a420f5"
+Global $SafeHash = 	"0x" & "23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
+					"0x" & "f2c9da10351ef1223bdeb7c6c87ed3da29be98ec"
 
-; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing they key for your own deployment could help though
+; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing the key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
 
 ; Register our exit function for cleanup
