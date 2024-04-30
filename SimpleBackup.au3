@@ -18,7 +18,7 @@
 
 #include <Array.au3>
 #include <File.au3>
-#Include <String.au3>
+#include <String.au3>
 #include <StaticConstants.au3>
 #include <AutoItConstants.au3>
 #include <Crypt.au3>
@@ -43,11 +43,11 @@ If Not @Compiled Then $LogLevel = 3
 Global $Version = 0
 If @Compiled Then $Version = FileGetVersion(@AutoItExe)
 Global $Title = StringTrimRight(@ScriptName, 4)
-Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Version,".", 0, -1))
+Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Version, ".", 0, -1))
 _ConsoleWrite("Starting " & $TitleVersion)
 
 ; Setup some miscellaneous globals
-Global $TempDir = _TempFile (@TempDir, "sbr", "tmp", 10)
+Global $TempDir = _TempFile(@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
 Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|SMTP_SendOnFailure|SMTP_SendOnSuccess"
@@ -61,8 +61,8 @@ Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
-Global $SafeHash = 	"0x" & "23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
-					"0x" & "f2c9da10351ef1223bdeb7c6c87ed3da29be98ec"
+Global $SafeHash = "0x" & "23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
+		"0x" & "f2c9da10351ef1223bdeb7c6c87ed3da29be98ec"
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing the key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
@@ -100,7 +100,7 @@ While 1
 	Global $aConfig = _ConfigToArray(_ReadConfig())
 
 	; If config is empty load it with the template, otherwise make sure it at least has required settings
-	if UBound($aConfig) = 0 Then
+	If UBound($aConfig) = 0 Then
 		_ForceRequiredConfig($aConfig, $SettingsTemplate)
 	Else
 		_ForceRequiredConfig($aConfig, $RequiredSettings)
@@ -113,18 +113,18 @@ While 1
 			_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
 			_ConsoleWrite("Valid Script Commands: setup, command")
 
-		; Basic commands allowed to be passed to the Restic executable
+			; Basic commands allowed to be passed to the Restic executable
 		Case "version", "stats", "init", "check", "snapshots", "--help"
 			_Restic($Command)
 
-		; Pass arbitrary commands to the Restic executable
+			; Pass arbitrary commands to the Restic executable
 		Case "c", "command"
 			_Auth()
 
 			$Run = StringTrimLeft($CmdLineRaw, StringLen($CmdLine[1]) + 1)
 			_Restic($Run)
 
-		; Backup command
+			; Backup command
 		Case "backup"
 			$Result = _Restic("backup " & _KeyValue($aConfig, "Backup_Path") & " --no-scan")
 			$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
@@ -142,13 +142,13 @@ While 1
 
 				_ConsoleWrite("Sending Email " & $sSubject)
 				_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
-					_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+						_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
 
 			EndIf
 
 			_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
 
-		; Setup GUI
+			; Setup GUI
 		Case "setup"
 			WinMove("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]", "", 4, 4)
 
@@ -157,42 +157,42 @@ While 1
 			Global $SettingsForm, $RunCombo
 
 			#Region ### START Koda GUI section ###
-			$SettingsForm = GUICreate("Title", 601, 533, -1, -1, BitOR($GUI_SS_DEFAULT_GUI,$WS_SIZEBOX,$WS_THICKFRAME))
+			$SettingsForm = GUICreate("Title", 601, 533, -1, -1, BitOR($GUI_SS_DEFAULT_GUI, $WS_SIZEBOX, $WS_THICKFRAME))
 			$ApplyButton = GUICtrlCreateButton("Apply", 510, 496, 75, 25)
-			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-			$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 585, 441, BitOR($GUI_SS_DEFAULT_EDIT,$WS_BORDER), 0)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT + $GUI_DOCKBOTTOM + $GUI_DOCKWIDTH + $GUI_DOCKHEIGHT)
+			$ScriptEdit = GUICtrlCreateEdit("", 7, 3, 585, 441, BitOR($GUI_SS_DEFAULT_EDIT, $WS_BORDER), 0)
 			GUICtrlSetData(-1, "")
 			GUICtrlSetFont(-1, 10, 400, 0, "Consolas")
-			GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKTOP+$GUI_DOCKBOTTOM)
+			GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 			$CancelButton = GUICtrlCreateButton("Cancel", 425, 496, 75, 25)
-			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT + $GUI_DOCKBOTTOM + $GUI_DOCKWIDTH + $GUI_DOCKHEIGHT)
 			$OKButton = GUICtrlCreateButton("OK", 339, 496, 75, 25)
-			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT + $GUI_DOCKBOTTOM + $GUI_DOCKWIDTH + $GUI_DOCKHEIGHT)
 			$RunButton = GUICtrlCreateButton("Run", 532, 456, 51, 33)
-			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKWIDTH+$GUI_DOCKHEIGHT)
-			$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 462, 505, 25, BitOR($CBS_DROPDOWN,$CBS_AUTOHSCROLL))
+			GUICtrlSetResizing(-1, $GUI_DOCKRIGHT + $GUI_DOCKBOTTOM + $GUI_DOCKWIDTH + $GUI_DOCKHEIGHT)
+			$RunCombo = GUICtrlCreateCombo("Select or Type A Command", 15, 462, 505, 25, BitOR($CBS_DROPDOWN, $CBS_AUTOHSCROLL))
 			GUICtrlSetFont(-1, 9, 400, 0, "Consolas")
-			GUICtrlSetResizing(-1, $GUI_DOCKLEFT+$GUI_DOCKRIGHT+$GUI_DOCKBOTTOM+$GUI_DOCKHEIGHT)
+			GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKBOTTOM + $GUI_DOCKHEIGHT)
 			GUISetState(@SW_SHOW)
 			#EndRegion ### END Koda GUI section ###
 
 			; Set some of the GUI parameters that we don't or can't do in Koda
 			WinSetTitle($SettingsForm, "", $TitleVersion) ; Set the title from title variable
 			If _GetProfileName() <> "Default" Then WinSetTitle($SettingsForm, "", $TitleVersion & " - " & _GetProfileName()) ; Change title to include profile if not the default profile
-			GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
+			GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)) ; Load the edit box with config data
 			_GUICtrlComboBox_SetDroppedWidth($RunCombo, 600) ; Set the width of the combobox drop down beyond the width of the combobox
 			_UpdateCommandComboBox() ; Set the options in the combobox
 
 			; Setup a custom menu
 			Global $MenuMsg = 0
 			If Not IsDeclared("ExitMenuItem") Then Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, _
-				$VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem, $AboutMenuItem, $WebsiteMenuItem
+					$VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem, $AboutMenuItem, $WebsiteMenuItem
 
 			; Setup file menu
 			$g_hFile = _GUICtrlMenu_CreateMenu()
 			; Create menu items based on config files found
 			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringTrimRight(@ScriptName, 4) & "*.dat", 1, True)
-			For $i = 1 To Ubound($aConfigFiles) - 1
+			For $i = 1 To UBound($aConfigFiles) - 1
 				$ThisProfileName = _GetProfileName($aConfigFiles[$i])
 				_ConsoleWrite("Found profile: " & $ThisProfileName)
 
@@ -228,7 +228,7 @@ While 1
 			_GUICtrlMenu_InsertMenuItem($g_hHelp, -1, "About " & $Title, $AboutMenuItem)
 
 			; Setup main menu
-			$g_hMain = _GUICtrlMenu_CreateMenu(BitOr($MNS_CHECKORBMP, $MNS_MODELESS))
+			$g_hMain = _GUICtrlMenu_CreateMenu(BitOR($MNS_CHECKORBMP, $MNS_MODELESS))
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&File", 0, $g_hFile)
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Tools", 0, $g_hTools)
 			_GUICtrlMenu_InsertMenuItem($g_hMain, -1, "&Advanced", 0, $g_hAdvanced)
@@ -253,7 +253,7 @@ While 1
 				If $nMsg = 0 And $MenuMsg <> 0 Then
 					$nMsg = $MenuMsg
 					$MenuMsg = 0
-				Endif
+				EndIf
 				If $nMsg <> 0 And Not ($nMsg > -13 And $nMsg < -3) Then _ConsoleWrite("Merged $nMsg = " & $nMsg, 3)
 
 				; Continue based on GUI action
@@ -273,17 +273,17 @@ While 1
 						If IsArray($aBackup_Path) Then
 							For $i = 0 To UBound($aBackup_Path) - 1
 								$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
-								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $aBackup_Path[$i])
+								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $aBackup_Path[$i])
 
 							Next
-						; No quoted strings were found so check the entire string
+							; No quoted strings were found so check the entire string
 						Else
 							$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
 							If Not FileExists($StrippedPath) Then
 								; The entire string wasn't a path so test up to the first space
 								; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
 								$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
-								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF&@CRLF & $sBackup_Path)
+								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $sBackup_Path)
 							EndIf
 						EndIf
 						If $nMsg = $OKButton Then Exit
@@ -291,36 +291,36 @@ While 1
 						; Since we just changed some settings, update the combo box which might be using data from our settings
 						_UpdateCommandComboBox()
 
-					; Close program
+						; Close program
 					Case $GUI_EVENT_CLOSE, $CancelButton, $ExitMenuItem
 						; Exit and run the registered exit function for cleanup
 						Exit
 
-					; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
+						; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
 					Case $FixConsoleMenuItem, $VerboseMenuItem
-						If  _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
-							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , False, False)
+						If _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
+							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg, False, False)
 						Else
-							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg , True, False)
+							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg, True, False)
 						EndIf
 
-					; Add missing key=value pairs to existing config
+						; Add missing key=value pairs to existing config
 					Case $TemplateMenuItem
 						_ForceRequiredConfig($aConfig, $SettingsTemplate)
-						GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)); Load the edit box with config data
+						GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)) ; Load the edit box with config data
 
-					; Open the github page
+						; Open the github page
 					Case $WebsiteMenuItem
 						ShellExecute("https://github.com/jmclaren7/restic-simple-backup")
 
-					; Open a dialog with program information
+						; Open a dialog with program information
 					Case $AboutMenuItem
 						MsgBox($MB_ICONINFORMATION, $TitleVersion, _
-							"Restic SimpleBackup" & @CRLF & "https://github.com/jmclaren7/restic-simple-backup" & @CRLF & "Copyright (c) 2023, John McLaren" & @CRLF & @CRLF & _
-							"Restic" & @CRLF & "https://github.com/restic/restic" & @CRLF & "Copyright (c) 2014, Alexander Neumann" & @CRLF & @CRLF & _
-							"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik")
+								"Restic SimpleBackup" & @CRLF & "https://github.com/jmclaren7/restic-simple-backup" & @CRLF & "Copyright (c) 2023, John McLaren" & @CRLF & @CRLF & _
+								"Restic" & @CRLF & "https://github.com/restic/restic" & @CRLF & "Copyright (c) 2014, Alexander Neumann" & @CRLF & @CRLF & _
+								"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik")
 
-					; Create or switch profile
+						; Create or switch profile
 					Case $NewProfileMenuItem, 1100 To 1199
 						_ConsoleWrite("Profile create/switch")
 
@@ -332,7 +332,7 @@ While 1
 						Else
 							$ActiveConfigFileFullPath = $aConfigFiles[$nMsg - 1100]
 
-						Endif
+						EndIf
 
 						_ConsoleWrite("$ActiveConfigFileFullPath=" & $ActiveConfigFileFullPath, 3)
 
@@ -340,15 +340,15 @@ While 1
 						GUIDelete($SettingsForm)
 						ContinueLoop 2
 
-					; Start the Restic-Browser
+						; Start the Restic-Browser
 					Case $BrowserMenuItem
 						; Pack and unpack the Restic-Browser executable
 						DirCreate($TempDir)
 						If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
 							_ConsoleWrite("FileInstall error")
-							Msgbox(16, $Title, "Error unpacking program")
+							MsgBox(16, $Title, "Error unpacking program")
 							Exit
-						Endif
+						EndIf
 
 						; Run a dummy restic command to unpack the restic executable
 						_Restic("version")
@@ -357,14 +357,14 @@ While 1
 						$EnvPath = EnvGet("Path")
 						If Not StringInStr($EnvPath, $TempDir) Then
 							EnvSet("Path", $TempDir & ";" & $EnvPath)
-							_ConsoleWrite("EnvSet: "&@error, 3)
+							_ConsoleWrite("EnvSet: " & @error, 3)
 						EndIf
 
 						; Verify the hash of the restic-browser.exe
 						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
 						If Not StringInStr($SafeHash, $Hash) Then
 							_ConsoleWrite("Hash error - " & $Hash)
-							Msgbox(16, $Title, "Error starting program")
+							MsgBox(16, $Title, "Error starting program")
 							Exit
 						EndIf
 
@@ -372,7 +372,7 @@ While 1
 						_UpdateEnv($aConfig)
 						$ResticBrowserPid = Run($ResticBrowserFullPath)
 
-					; Create a sceduled task to run the backup
+						; Create a sceduled task to run the backup
 					Case $ScheduledTaskMenuItem
 						If _GetProfileName() <> "Default" Then
 							$ProfileSwitch = " profile " & _GetProfileName()
@@ -382,7 +382,7 @@ While 1
 							$TaskName = ""
 						EndIf
 
-						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & $TaskName  & " /TR ""'" & @ScriptFullPath & "' backup" & $ProfileSwitch & """ /ST 22:00 /RL Highest /NP /F /RU System"
+						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & $TaskName & " /TR ""'" & @ScriptFullPath & "' backup" & $ProfileSwitch & """ /ST 22:00 /RL Highest /NP /F /RU System"
 						_ConsoleWrite($Run)
 						$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
 						If StringInStr($Return, "SUCCESS: ") Then
@@ -392,7 +392,7 @@ While 1
 							If Not @Compiled Then MsgBox($MB_ICONERROR, $TitleVersion, "Are you running without admin?")
 						EndIf
 
-					; Run the command provided from the combobox
+						; Run the command provided from the combobox
 					Case $RunButton
 						; Adjust window visibility and activation due to long running process
 						GUISetState(@SW_DISABLE, $SettingsForm)
@@ -412,7 +412,7 @@ While 1
 									$sSubject = "Test Subject"
 									$sBody = "Test Body"
 									$Return = _INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _KeyValue($aConfig, "SMTP_ToAddress"), _
-										$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
+											$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
 									_ConsoleWrite("Email Test: $Return=" & $Return & "  @error=" & @error)
 								EndIf
 
@@ -440,14 +440,14 @@ While 1
 				If BitAND(WinGetState($SettingsForm), @SW_DISABLE) Then
 					GUISetState(@SW_ENABLE, $SettingsForm)
 					WinSetTrans($SettingsForm, "", 255)
-				Endif
+				EndIf
 
 				; Removes help text from combobox selection
 				$RunComboText = GUICtrlRead($RunCombo)
 				If StringRight($RunComboText, 1) = ")" And StringInStr($RunComboText, "  (") And Not _GUICtrlComboBox_GetDroppedState($RunCombo) Then
-					$NewText = StringLeft($RunComboText, StringInStr($RunComboText, "  (") -1)
+					$NewText = StringLeft($RunComboText, StringInStr($RunComboText, "  (") - 1)
 					_GUICtrlComboBox_SetEditText($RunCombo, $NewText)
-				Endif
+				EndIf
 
 				Sleep(10)
 			WEnd
@@ -455,10 +455,10 @@ While 1
 		Case Else
 			_ConsoleWrite("Invalid Command")
 
- 	EndSwitch
+	EndSwitch
 
 	Exit ; To support existing program flow since adding loop used to restart GUI
-Wend
+WEnd
 
 ;=====================================================================================
 ;=====================================================================================
@@ -473,7 +473,7 @@ Func _GetProfileName($sPath = Default)
 	Else
 		Return $Return[0]
 	EndIf
-EndFunc
+EndFunc   ;==>_GetProfileName
 
 ; Construct profile path from profile name
 Func _GetProfileFullPath($sProfile = Default)
@@ -485,21 +485,21 @@ Func _GetProfileFullPath($sProfile = Default)
 
 	Return StringTrimRight(@ScriptFullPath, 4) & $sProfile & ".dat"
 
-EndFunc
+EndFunc   ;==>_GetProfileFullPath
 
 ; Special function to handle messages from custom GUI menu
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
-		Local $Temp = _WinAPI_LoWord($wParam)
+	Local $Temp = _WinAPI_LoWord($wParam)
 
-		;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
+	;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
 
-		If $Temp >= 1000 And $Temp < 1999 Then
-			_ConsoleWrite("Updated $MenuMsg To " & $Temp, 3)
-			Global $MenuMsg = $Temp
-		EndIf
+	If $Temp >= 1000 And $Temp < 1999 Then
+		_ConsoleWrite("Updated $MenuMsg To " & $Temp, 3)
+		Global $MenuMsg = $Temp
+	EndIf
 
-        Return $GUI_RUNDEFMSG
-EndFunc
+	Return $GUI_RUNDEFMSG
+EndFunc   ;==>_WM_COMMAND
 
 ; Prompt for a password before continuing
 Func _Auth()
@@ -514,16 +514,16 @@ Func _Auth()
 		$InputPass = InputBox($TitleVersion, "Enter Password", "", "*", Default, 130)
 		If @error Then Exit
 
-	Wend
+	WEnd
 
 	Return
-EndFunc
+EndFunc   ;==>_Auth
 
 ; Updates the options in the GUI combo box
 Func _UpdateCommandComboBox()
 	_ConsoleWrite("_UpdateCommandComboBox", 3)
 
-	_GUICtrlComboBox_ResetContent ( $RunCombo )
+	_GUICtrlComboBox_ResetContent($RunCombo)
 
 	$Opts = "Select or type a Restic command"
 	$Opts &= "|" & "init  (Create the Restic repository)"
@@ -537,7 +537,7 @@ Func _UpdateCommandComboBox()
 	$Opts &= "|" & "--help  (Show Restic help information)"
 	GUICtrlSetData($RunCombo, $Opts, "Select or type a Restic command")
 
-EndFunc
+EndFunc   ;==>_UpdateCommandComboBox
 
 ; Update the environmental variables
 Func _UpdateEnv($aArray, $Delete = Default)
@@ -548,11 +548,11 @@ Func _UpdateEnv($aArray, $Delete = Default)
 	Local $aInternalSettings = StringSplit($InternalSettings, "|")
 
 	; Loop array and set or delete Env
-	For $i=1 To $aArray[0][0]
+	For $i = 1 To $aArray[0][0]
 		; Skip If the value is a comment, empty or internal
 		If StringLeft($aArray[$i][0], 1) = "#" Then ContinueLoop
-		If $aArray[$i][0] = "" OR $aArray[$i][1] = "" Then ContinueLoop
-		If _ArraySearch ($aInternalSettings, $aArray[$i][0], 0, 0, 0, 0) <> -1 Then ContinueLoop
+		If $aArray[$i][0] = "" Or $aArray[$i][1] = "" Then ContinueLoop
+		If _ArraySearch($aInternalSettings, $aArray[$i][0], 0, 0, 0, 0) <> -1 Then ContinueLoop
 
 		If $Delete Then
 			_ConsoleWrite("  EnvSet (Delete): " & $aArray[$i][0], 3)
@@ -564,16 +564,16 @@ Func _UpdateEnv($aArray, $Delete = Default)
 	Next
 
 	Return
-EndFunc
+EndFunc   ;==>_UpdateEnv
 
 ; Force required keys to show in the config array
-Func _ForceRequiredConfig(Byref $aArray, $sRequired)
+Func _ForceRequiredConfig(ByRef $aArray, $sRequired)
 	Local $aKeyValuem, $sValue
 
 	$sRequired = StringSplit($sRequired, "|")
 
 	For $i = 1 To $sRequired[0]
-		$aKeyValue = StringSplit($sRequired[$i],"=")
+		$aKeyValue = StringSplit($sRequired[$i], "=")
 		_KeyValue($aArray, $aKeyValue[1])
 
 		If $aKeyValue[0] = 2 Then
@@ -584,7 +584,7 @@ Func _ForceRequiredConfig(Byref $aArray, $sRequired)
 
 		If @error Then _KeyValue($aArray, $aKeyValue[1], $sValue)
 	Next
-EndFunc
+EndFunc   ;==>_ForceRequiredConfig
 
 ; Converts string of key=value pairs to array and handles comments
 Func _ConfigToArray($ConfigData)
@@ -599,7 +599,7 @@ Func _ConfigToArray($ConfigData)
 		If StringLeft($aConfigLines[$i], 1) = "#" Then $aConfigLines[$i] = "#" & $i & "=" & $aConfigLines[$i]
 
 		$Key = StringLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "=") - 1)
-		$Key = StringStripWS ($Key, 1 + 2)
+		$Key = StringStripWS($Key, 1 + 2)
 
 		If $Key = "" Then ContinueLoop
 
@@ -611,7 +611,7 @@ Func _ConfigToArray($ConfigData)
 
 
 	Return $aArray
-EndFunc
+EndFunc   ;==>_ConfigToArray
 
 ; Converts array back to a string of key=value pairs and fix comments
 Func _ArrayToConfig($aArray)
@@ -622,7 +622,7 @@ Func _ArrayToConfig($aArray)
 	Local $ConfigData, $Add
 
 	; Loop array and combine key=value pairs
-	For $i=1 To $aArray[0][0]
+	For $i = 1 To $aArray[0][0]
 		; If the value is a comment remove the placeholder key
 		If StringLeft($aArray[$i][0], 1) = "#" Then
 			$Add = $aArray[$i][1]
@@ -636,7 +636,7 @@ Func _ArrayToConfig($aArray)
 	Next
 
 	Return $ConfigData
-EndFunc
+EndFunc   ;==>_ArrayToConfig
 
 ; Read and decrypt the config file
 Func _ReadConfig()
@@ -648,7 +648,7 @@ Func _ReadConfig()
 	$ConfigData = BinaryToString(_Crypt_DecryptData($ConfigData, $HwKey, $CALG_AES_256))
 
 	Return $ConfigData
-EndFunc
+EndFunc   ;==>_ReadConfig
 
 ; Encrypt and write the config file
 Func _WriteConfig($ConfigData)
@@ -661,7 +661,7 @@ Func _WriteConfig($ConfigData)
 	FileWrite($hConfigFile, $ConfigData)
 
 	Return
-EndFunc
+EndFunc   ;==>_WriteConfig
 
 ; Execute a Restic command
 Func _Restic($Command, $Opt = $RunSTDIO)
@@ -672,13 +672,13 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 	If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
 		_ConsoleWrite("FileInstall error")
 		Exit
-	Endif
+	EndIf
 
 	; Verify the hash of the Restic executable
 	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
 	If Not StringInStr($SafeHash, $Hash) Then
 		_ConsoleWrite("Hash error - " & $Hash)
-		Msgbox(16, $Title, "Error starting program")
+		MsgBox(16, $Title, "Error starting program")
 		Exit
 	EndIf
 
@@ -691,11 +691,11 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	_ConsoleWrite("  _RunWait", 2)
 	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
-	Local $Return = _RunWait($Run, @ScriptDir, @SW_Hide, $Opt, True)
+	Local $Return = _RunWait($Run, @ScriptDir, @SW_HIDE, $Opt, True)
 	_UpdateEnv($aConfig, True) ; Remove env values
 
 	Return $Return
-EndFunc
+EndFunc   ;==>_Restic
 
 ; Do cleanup on script exit
 Func _Exit()
@@ -719,5 +719,5 @@ Func _Exit()
 	EndIf
 
 	_ConsoleWrite("  Cleanup Done, Exiting Program")
-EndFunc
+EndFunc   ;==>_Exit
 
