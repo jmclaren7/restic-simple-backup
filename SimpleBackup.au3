@@ -669,7 +669,7 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 
 	; Pack and unpack the Restic executable
 	DirCreate($TempDir)
-	If FileInstall("include\restic64.exe", $ResticFullPath, 1) = 0 Then
+	If FileInstall("include\restic.exe", $ResticFullPath, 1) = 0 Then
 		_ConsoleWrite("FileInstall error")
 		Exit
 	EndIf
