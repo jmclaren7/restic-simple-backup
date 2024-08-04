@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.264
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.271
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -61,8 +61,6 @@ Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
-Global $SafeHash = "0x" & "23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
-		"0x" & "f2c9da10351ef1223bdeb7c6c87ed3da29be98ec"
 Global $SafeHash = "0x23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
 		"0xf2c9da10351ef1223bdeb7c6c87ed3da29be98ec" & _
 		"0x96440aef8599e107af6900c7db6726052368417c" & _ ; 7/28/24
@@ -117,19 +115,24 @@ While 1
 			_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
 			_ConsoleWrite("Valid Script Commands: setup, command")
 
-			; Basic commands allowed to be passed to the Restic executable
+		; Basic commands allowed to be passed to the Restic executable
 		Case "version", "stats", "init", "check", "snapshots", "--help"
 			_Restic($Command)
 
-			; Pass arbitrary commands to the Restic executable
+		; Pass arbitrary commands to the Restic executable
 		Case "c", "command"
 			_Auth()
 
 			$Run = StringTrimLeft($CmdLineRaw, StringLen($CmdLine[1]) + 1)
 			_Restic($Run)
 
-			; Backup command
+		; Backup command
 		Case "backup"
+			If _KeyValue($aConfig, "Backup_Path") = "" Then
+				_ConsoleWrite("Backup path not set, skipping")
+				ContinueCase
+			EndIf
+
 			$Result = _Restic("backup " & _KeyValue($aConfig, "Backup_Path") & " --no-scan")
 			$BackupSuccess = StringRegExp($Result, "snapshot [0-9a-fA-F]+ saved")
 
@@ -152,7 +155,7 @@ While 1
 
 			_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
 
-			; Setup GUI
+		; Setup GUI
 		Case "setup"
 			WinMove("[TITLE:" & @AutoItExe & "; CLASS:ConsoleWindowClass]", "", 4, 4)
 
@@ -269,25 +272,27 @@ While 1
 						_WriteConfig(_ArrayToConfig($aConfig))
 
 						; Warn user if the backup path doesn't make sense
-						$ErrorMessage = "Back_Path might contain an invalid path, your settings have been saved but please verify you have specified a valid path and used quotes properly. This warning was triggered based on the follow text..."
-						$sBackup_Path = _KeyValue($aConfig, "Backup_Path")
-						$aBackup_Path = StringRegExp($sBackup_Path, '["''].*?["'']', $STR_REGEXPARRAYGLOBALMATCH)
+						If _KeyValue($aConfig, "Backup_Path") <> "" Then
+							$ErrorMessage = "Back_Path might contain an invalid path, your settings have been saved but please verify you have specified a valid path and used quotes properly. This warning was triggered based on the follow text..."
+							$sBackup_Path = _KeyValue($aConfig, "Backup_Path")
+							$aBackup_Path = StringRegExp($sBackup_Path, '["''].*?["'']', $STR_REGEXPARRAYGLOBALMATCH)
 
-						; Check for paths inside quoted strings
-						If IsArray($aBackup_Path) Then
-							For $i = 0 To UBound($aBackup_Path) - 1
-								$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
-								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $aBackup_Path[$i])
+							; Check for paths inside quoted strings
+							If IsArray($aBackup_Path) Then
+								For $i = 0 To UBound($aBackup_Path) - 1
+									$StrippedPath = StringReplace($aBackup_Path[$i], """", "")
+									If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $aBackup_Path[$i])
 
-							Next
+								Next
 							; No quoted strings were found so check the entire string
-						Else
-							$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
-							If Not FileExists($StrippedPath) Then
-								; The entire string wasn't a path so test up to the first space
-								; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
-								$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
-								If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $sBackup_Path)
+							Else
+								$StrippedPath = StringReplace($sBackup_Path, """", "") ; todo: only trim quotes from first and last
+								If Not FileExists($StrippedPath) Then
+									; The entire string wasn't a path so test up to the first space
+									; This wont capture issues if we have more than one path seperated by space but that would be hard to do if we also want to access parameters here
+									$StrippedPath = StringLeft($StrippedPath, StringInStr($StrippedPath, " "))
+									If Not FileExists($StrippedPath) Then MsgBox($MB_ICONINFORMATION, $TitleVersion, $ErrorMessage & @CRLF & @CRLF & $sBackup_Path)
+								EndIf
 							EndIf
 						EndIf
 						If $nMsg = $OKButton Then Exit
@@ -295,12 +300,12 @@ While 1
 						; Since we just changed some settings, update the combo box which might be using data from our settings
 						_UpdateCommandComboBox()
 
-						; Close program
+					; Close program
 					Case $GUI_EVENT_CLOSE, $CancelButton, $ExitMenuItem
 						; Exit and run the registered exit function for cleanup
 						Exit
 
-						; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
+					; Custom menu items that use checkboxes need to be check and unchecked manually when clicked
 					Case $FixConsoleMenuItem, $VerboseMenuItem
 						If _GUICtrlMenu_GetItemChecked($g_hMain, $nMsg, False) Then
 							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg, False, False)
@@ -308,24 +313,23 @@ While 1
 							_GUICtrlMenu_SetItemChecked($g_hMain, $nMsg, True, False)
 						EndIf
 
-						; Add missing key=value pairs to existing config
+					; Add missing key=value pairs to existing config
 					Case $TemplateMenuItem
 						_ForceRequiredConfig($aConfig, $SettingsTemplate)
 						GUICtrlSetData($ScriptEdit, _ArrayToConfig($aConfig)) ; Load the edit box with config data
 
-						; Open the github page
+					; Open the github page
 					Case $WebsiteMenuItem
 						ShellExecute("https://github.com/jmclaren7/restic-simple-backup")
 
-						; Open a dialog with program information
+					; Open a dialog with program information
 					Case $AboutMenuItem
 						MsgBox($MB_ICONINFORMATION, $TitleVersion, _
 								"Restic SimpleBackup" & @CRLF & "https://github.com/jmclaren7/restic-simple-backup" & @CRLF & "Copyright (c) 2023, John McLaren" & @CRLF & @CRLF & _
 								"Restic" & @CRLF & "https://github.com/restic/restic" & @CRLF & "Copyright (c) 2014, Alexander Neumann" & @CRLF & @CRLF & _
-								"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik")
 								"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik", 0, $SettingsForm)
 
-						; Create or switch profile
+					; Create or switch profile
 					Case $NewProfileMenuItem, 1100 To 1199
 						_ConsoleWrite("Profile create/switch")
 
@@ -345,7 +349,7 @@ While 1
 						GUIDelete($SettingsForm)
 						ContinueLoop 2
 
-						; Start the Restic-Browser
+					; Start the Restic-Browser
 					Case $BrowserMenuItem
 						; Pack and unpack the Restic-Browser executable
 						DirCreate($TempDir)
@@ -377,7 +381,7 @@ While 1
 						_UpdateEnv($aConfig)
 						$ResticBrowserPid = Run($ResticBrowserFullPath)
 
-						; Create a sceduled task to run the backup
+					; Create a sceduled task to run the backup
 					Case $ScheduledTaskMenuItem
 						If _GetProfileName() <> "Default" Then
 							$ProfileSwitch = " profile " & _GetProfileName()
@@ -397,7 +401,7 @@ While 1
 							If Not @Compiled Then MsgBox($MB_ICONERROR, $TitleVersion, "Are you running without admin?")
 						EndIf
 
-						; Run the command provided from the combobox
+					; Run the command provided from the combobox
 					Case $RunButton
 						; Adjust window visibility and activation due to long running process
 						GUISetState(@SW_DISABLE, $SettingsForm)
@@ -509,7 +513,6 @@ EndFunc   ;==>_WM_COMMAND
 ; Prompt for a password before continuing
 Func _Auth()
 	_ConsoleWrite("_Auth", 3)
-
 	Local $InputPass
 
 	While 1
