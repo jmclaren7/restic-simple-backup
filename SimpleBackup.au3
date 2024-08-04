@@ -63,6 +63,10 @@ Global $RunSTDIO = $STDERR_MERGED
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
 Global $SafeHash = "0x" & "23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
 		"0x" & "f2c9da10351ef1223bdeb7c6c87ed3da29be98ec"
+Global $SafeHash = "0x23a62a1045cce2e8404c0e643fcba905ceefd34e" & _
+		"0xf2c9da10351ef1223bdeb7c6c87ed3da29be98ec" & _
+		"0x96440aef8599e107af6900c7db6726052368417c" & _ ; 7/28/24
+		"0x4a2720648afdec7872ece528381515b35ddda1d6" ; 7/28/24
 
 ; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing the key for your own deployment could help though
 Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
