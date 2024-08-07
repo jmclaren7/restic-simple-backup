@@ -725,7 +725,7 @@ Func _Exit()
 
 	; Close any instance of restic-browser
 	If IsDeclared("ResticBrowserPid") Then ProcessClose($ResticBrowserPid)
-	ProcessClose("Restic-Browser.exe")
+	;ProcessClose("Restic-Browser.exe")
 
 	; Delete any temp folders we ever created
 	Local $sPath = @TempDir & "\"
