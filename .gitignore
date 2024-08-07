@@ -1,4 +1,4 @@
-SimpleBackup*.dat
+*.dat
+*.log
+*_stripped.au3
 SimpleBackup.exe
-SimpleBackup_Log.txt
-SimpleBackup_stripped.au3
