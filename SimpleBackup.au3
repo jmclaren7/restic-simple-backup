@@ -1,10 +1,11 @@
+#NoTrayIcon
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=include\SimpleBackup.ico
 #AutoIt3Wrapper_Compression=4
 #AutoIt3Wrapper_UseX64=y
-#AutoIt3Wrapper_Change2CUI=y
+#AutoIt3Wrapper_Change2CUI=n
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.271
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.272
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -13,38 +14,48 @@
 #AutoIt3Wrapper_Run_Au3Stripper=y
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
-#NoTrayIcon
 ;#RequireAdmin
 
 #include <Array.au3>
-#include <File.au3>
-#include <String.au3>
-#include <StaticConstants.au3>
 #include <AutoItConstants.au3>
 #include <Crypt.au3>
-#include <WinAPIDiag.au3>
-#include <WinAPIConv.au3>
-#include <GUIConstantsEx.au3>
+#include <File.au3>
 #include <GuiComboBox.au3>
+#include <GUIConstantsEx.au3>
 #include <GuiEdit.au3>
 #include <GuiMenu.au3>
+#include <StaticConstants.au3>
+#include <String.au3>
+#include <WinAPIConv.au3>
+#include <WinAPIDiag.au3>
+#include <WinAPISysWin.au3>
 #include <WindowsConstants.au3>
 
 ; https://github.com/jmclaren7/autoit-scripts/blob/master/CommonFunctions.au3
-#include <include\External.au3>
-
-; Setup Logging For _ConsoleWrite
-Global $LogToFile = 0
-Global $LogFileMaxSize = 512
-Global $LogLevel = 1
-If Not @Compiled Then $LogLevel = 3
+#include <include\CommonFunctions.au3>
+#include <include\Console.au3>
 
 ; Setup version and program title globals
 Global $Version = 0
 If @Compiled Then $Version = FileGetVersion(@AutoItExe)
 Global $Title = StringTrimRight(@ScriptName, 4)
 Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Version, ".", 0, -1))
-_ConsoleWrite("Starting " & $TitleVersion)
+
+; Setup Logging
+_Console_Attach() ; If it was launched from a console, attach to that console
+Global $LogToFile = 0
+Global $LogFileMaxSize = 512
+Global $LogWindowStart = 1
+Global $LogLevel = 1
+If @Compiled Then
+	$LogFullPath = StringTrimRight(@ScriptFullPath, 4) & ".log"
+	_Console_Alloc()
+Else
+	$LogLevel = 3
+	Global $LogTitle = "Log - " & $Title
+EndIf
+
+_Log("Starting " & $TitleVersion)
 
 ; Setup some miscellaneous globals
 Global $TempDir = _TempFile(@TempDir, "sbr", "tmp", 10)
@@ -56,8 +67,7 @@ Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOS
 Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
 Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 
-; $RunSTDIO will determine how we execute restic, if this is not done properly we will miss console output or log output
-; This value changes depending on program contexts to give us the most aplicable output
+; $RunSTDIO will determine how we execute restic, default $STDERR_MERGED will allow restic output to be logged to file
 Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
@@ -72,18 +82,16 @@ Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive &
 ; Register our exit function for cleanup
 OnAutoItExitRegister("_Exit")
 
-
-
 ; Interpret command line parameters
 $Command = Default
 For $i = 1 To $CmdLine[0]
-	_ConsoleWrite("Parameter: " & $CmdLine[$i])
+	_Log("Parameter: " & $CmdLine[$i])
 	Switch $CmdLine[$i]
 		Case "profile"
 			; The profile parameter and the following parameter are used to adjust the
 			$i = $i + 1
 			$ActiveConfigFileFullPath = _GetProfileFullPath($CmdLine[$i])
-			_ConsoleWrite("Config file is now " & $ActiveConfigFileFullPath)
+			_Log("Config file is now " & $ActiveConfigFileFullPath)
 
 		Case Else
 			; The first parameter not specialy handled must be the command
@@ -94,7 +102,7 @@ Next
 
 ; Default command for when no parameters are provided
 If $Command = Default Then $Command = "setup"
-_ConsoleWrite("Command: " & $Command)
+_Log("Command: " & $Command)
 
 ; This loop is used to effectively restart the program for when we switch profiles
 While 1
@@ -112,8 +120,8 @@ While 1
 	Switch $Command
 		; Display help information
 		Case "help", "/?"
-			_ConsoleWrite("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
-			_ConsoleWrite("Valid Script Commands: setup, command")
+			_Log("Valid Restic Commands: version, stats, init, check, snapshots, backup, --help")
+			_Log("Valid Script Commands: setup, command")
 
 		; Basic commands allowed to be passed to the Restic executable
 		Case "version", "stats", "init", "check", "snapshots", "--help"
@@ -129,7 +137,7 @@ While 1
 		; Backup command
 		Case "backup"
 			If _KeyValue($aConfig, "Backup_Path") = "" Then
-				_ConsoleWrite("Backup path not set, skipping")
+				_Log("Backup path not set, skipping")
 				ContinueCase
 			EndIf
 
@@ -147,7 +155,7 @@ While 1
 				$sSubject = StringStripWS($sSubject, 1)
 				$sBody = $Result
 
-				_ConsoleWrite("Sending Email " & $sSubject)
+				_Log("Sending Email " & $sSubject)
 				_INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _
 						_KeyValue($aConfig, "SMTP_ToAddress"), $sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
 
@@ -201,7 +209,7 @@ While 1
 			Global $aConfigFiles = _FileListToArray(@ScriptDir, StringTrimRight(@ScriptName, 4) & "*.dat", 1, True)
 			For $i = 1 To UBound($aConfigFiles) - 1
 				$ThisProfileName = _GetProfileName($aConfigFiles[$i])
-				_ConsoleWrite("Found profile: " & $ThisProfileName)
+				_Log("Found profile: " & $ThisProfileName)
 
 				$cmdID = 1100 + $i
 
@@ -226,8 +234,8 @@ While 1
 
 			; Setup advanced menu
 			$g_hAdvanced = _GUICtrlMenu_CreateMenu()
-			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Fix Console Live Output While In GUI (Breaks file log)", $FixConsoleMenuItem)
-			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Verbose Logs (While In GUI)", $VerboseMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Make Restic Progress Bar Work In Console (breaks file log)", $FixConsoleMenuItem)
+			_GUICtrlMenu_InsertMenuItem($g_hAdvanced, -1, "Verbose Logs (While in GUI, may contain secrets)", $VerboseMenuItem)
 
 			; Setup help menu
 			$g_hHelp = _GUICtrlMenu_CreateMenu()
@@ -245,7 +253,7 @@ While 1
 			_GUICtrlMenu_SetMenu($SettingsForm, $g_hMain)
 
 			; Additonal menu setup
-			_GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False) ;
+			If @Compiled Then _GUICtrlMenu_SetItemState($g_hMain, $FixConsoleMenuItem, $MFS_CHECKED, True, False)
 			If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 			GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
@@ -261,13 +269,13 @@ While 1
 					$nMsg = $MenuMsg
 					$MenuMsg = 0
 				EndIf
-				If $nMsg <> 0 And Not ($nMsg > -13 And $nMsg < -3) Then _ConsoleWrite("Merged $nMsg = " & $nMsg, 3)
+				If $nMsg <> 0 And Not ($nMsg > -13 And $nMsg < -3) Then _Log("Merged $nMsg = " & $nMsg, 3)
 
 				; Continue based on GUI action
 				Switch $nMsg
 					; Save or save and close
 					Case $ApplyButton, $OKButton
-						_ConsoleWrite("Apply/Ok")
+						_Log("Apply/Ok")
 						$aConfig = _ConfigToArray(GUICtrlRead($ScriptEdit))
 						_WriteConfig(_ArrayToConfig($aConfig))
 
@@ -331,7 +339,7 @@ While 1
 
 					; Create or switch profile
 					Case $NewProfileMenuItem, 1100 To 1199
-						_ConsoleWrite("Profile create/switch")
+						_Log("Profile create/switch")
 
 						If $nMsg = $NewProfileMenuItem Then
 							; Prompt for profile name, if the profile name already exists it will be loaded
@@ -343,7 +351,7 @@ While 1
 
 						EndIf
 
-						_ConsoleWrite("$ActiveConfigFileFullPath=" & $ActiveConfigFileFullPath, 3)
+						_Log("$ActiveConfigFileFullPath=" & $ActiveConfigFileFullPath, 3)
 
 						; Delete the GUI and restart
 						GUIDelete($SettingsForm)
@@ -354,7 +362,7 @@ While 1
 						; Pack and unpack the Restic-Browser executable
 						DirCreate($TempDir)
 						If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
-							_ConsoleWrite("FileInstall error")
+							_Log("FileInstall error")
 							MsgBox(16, $Title, "Error unpacking program")
 							Exit
 						EndIf
@@ -366,13 +374,13 @@ While 1
 						$EnvPath = EnvGet("Path")
 						If Not StringInStr($EnvPath, $TempDir) Then
 							EnvSet("Path", $TempDir & ";" & $EnvPath)
-							_ConsoleWrite("EnvSet: " & @error, 3)
+							_Log("EnvSet: " & @error, 3)
 						EndIf
 
 						; Verify the hash of the restic-browser.exe
 						Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
 						If Not StringInStr($SafeHash, $Hash) Then
-							_ConsoleWrite("Hash error - " & $Hash)
+							_Log("Hash error - " & $Hash)
 							MsgBox(16, $Title, "Error starting program")
 							Exit
 						EndIf
@@ -392,7 +400,7 @@ While 1
 						EndIf
 
 						$Run = "SCHTASKS /CREATE /SC DAILY /TN " & $Title & $TaskName & " /TR ""'" & @ScriptFullPath & "' backup" & $ProfileSwitch & """ /ST 22:00 /RL Highest /NP /F /RU System"
-						_ConsoleWrite($Run)
+						_Log($Run)
 						$Return = _RunWait($Run, @ScriptDir, @SW_SHOW, $STDERR_MERGED, True)
 						If StringInStr($Return, "SUCCESS: ") Then
 							MsgBox(0, $TitleVersion, "Scheduled task created. Please review and test the task.")
@@ -422,11 +430,11 @@ While 1
 									$sBody = "Test Body"
 									$Return = _INetSmtpMailCom(_KeyValue($aConfig, "SMTP_Server"), _KeyValue($aConfig, "SMTP_FromName"), _KeyValue($aConfig, "SMTP_FromAddress"), _KeyValue($aConfig, "SMTP_ToAddress"), _
 											$sSubject, $sBody, _KeyValue($aConfig, "SMTP_UserName"), _KeyValue($aConfig, "SMTP_Password"))
-									_ConsoleWrite("Email Test: $Return=" & $Return & "  @error=" & @error)
+									_Log("Email Test: $Return=" & $Return & "  @error=" & @error)
 								EndIf
 
 							Case Else
-								_Restic($RunComboText)
+								$PID = _Restic($RunComboText)
 
 						EndSwitch
 				EndSwitch
@@ -440,7 +448,7 @@ While 1
 
 				; Adjust the global used to determine STDIO streams for child processes
 				If _GUICtrlMenu_GetItemChecked($g_hMain, $FixConsoleMenuItem, False) Then
-					$RunSTDIO = $STDIO_INHERIT_PARENT
+					$RunSTDIO = 0
 				Else
 					$RunSTDIO = $STDERR_MERGED
 				EndIf
@@ -462,7 +470,7 @@ While 1
 			WEnd
 
 		Case Else
-			_ConsoleWrite("Invalid Command")
+			_Log("Invalid Command")
 
 	EndSwitch
 
@@ -500,10 +508,10 @@ EndFunc   ;==>_GetProfileFullPath
 Func _WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	Local $Temp = _WinAPI_LoWord($wParam)
 
-	;_ConsoleWrite("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
+	;_Log("_WM_COMMAND ($wParam = " & $Temp & ") ", 3)
 
 	If $Temp >= 1000 And $Temp < 1999 Then
-		_ConsoleWrite("Updated $MenuMsg To " & $Temp, 3)
+		_Log("Updated $MenuMsg To " & $Temp, 3)
 		Global $MenuMsg = $Temp
 	EndIf
 
@@ -512,7 +520,7 @@ EndFunc   ;==>_WM_COMMAND
 
 ; Prompt for a password before continuing
 Func _Auth()
-	_ConsoleWrite("_Auth", 3)
+	_Log("_Auth", 3)
 	Local $InputPass
 
 	While 1
@@ -529,7 +537,7 @@ EndFunc   ;==>_Auth
 
 ; Updates the options in the GUI combo box
 Func _UpdateCommandComboBox()
-	_ConsoleWrite("_UpdateCommandComboBox", 3)
+	_Log("_UpdateCommandComboBox", 3)
 
 	_GUICtrlComboBox_ResetContent($RunCombo)
 
@@ -549,7 +557,7 @@ EndFunc   ;==>_UpdateCommandComboBox
 
 ; Update the environmental variables
 Func _UpdateEnv($aArray, $Delete = Default)
-	_ConsoleWrite("_UpdateEnv", 3)
+	_Log("_UpdateEnv", 3)
 
 	If $Delete = Default Then $Delete = False
 
@@ -563,10 +571,10 @@ Func _UpdateEnv($aArray, $Delete = Default)
 		If _ArraySearch($aInternalSettings, $aArray[$i][0], 0, 0, 0, 0) <> -1 Then ContinueLoop
 
 		If $Delete Then
-			_ConsoleWrite("  EnvSet (Delete): " & $aArray[$i][0], 3)
+			_Log("  EnvSet (Delete): " & $aArray[$i][0], 3)
 			EnvSet($aArray[$i][0], "")
 		Else
-			_ConsoleWrite("  EnvSet: " & $aArray[$i][0], 3)
+			_Log("  EnvSet: " & $aArray[$i][0], 3)
 			EnvSet($aArray[$i][0], $aArray[$i][1])
 		EndIf
 	Next
@@ -596,7 +604,7 @@ EndFunc   ;==>_ForceRequiredConfig
 
 ; Converts string of key=value pairs to array and handles comments
 Func _ConfigToArray($ConfigData)
-	_ConsoleWrite("_ConfigToArray", 3)
+	_Log("_ConfigToArray", 3)
 
 	$aConfigLines = StringSplit($ConfigData, @CRLF, 1)
 	Local $aArray[]
@@ -623,7 +631,7 @@ EndFunc   ;==>_ConfigToArray
 
 ; Converts array back to a string of key=value pairs and fix comments
 Func _ArrayToConfig($aArray)
-	_ConsoleWrite("_ArrayToConfig", 3)
+	_Log("_ArrayToConfig", 3)
 
 	If UBound($aArray, 0) <> 2 Then Return SetError(1, 0, "")
 
@@ -648,7 +656,7 @@ EndFunc   ;==>_ArrayToConfig
 
 ; Read and decrypt the config file
 Func _ReadConfig()
-	_ConsoleWrite("_ReadConfig", 3)
+	_Log("_ReadConfig", 3)
 
 	Local $ConfigData = FileRead($ActiveConfigFileFullPath)
 
@@ -660,7 +668,7 @@ EndFunc   ;==>_ReadConfig
 
 ; Encrypt and write the config file
 Func _WriteConfig($ConfigData)
-	_ConsoleWrite("_WriteConfig", 3)
+	_Log("_WriteConfig", 3)
 
 	; Encrypt
 	$ConfigData = _Crypt_EncryptData($ConfigData, $HwKey, $CALG_AES_256)
@@ -672,20 +680,22 @@ Func _WriteConfig($ConfigData)
 EndFunc   ;==>_WriteConfig
 
 ; Execute a Restic command
-Func _Restic($Command, $Opt = $RunSTDIO)
-	_ConsoleWrite("_Restic", 3)
+Func _Restic($Command)
+	_Log("_Restic", 3)
+
+	Global $RunSTDIO, $TempDir, $ResticFullPath
 
 	; Pack and unpack the Restic executable
 	DirCreate($TempDir)
 	If FileInstall("include\restic.exe", $ResticFullPath, 1) = 0 Then
-		_ConsoleWrite("FileInstall error")
+		_Log("FileInstall error")
 		Exit
 	EndIf
 
 	; Verify the hash of the Restic executable
 	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
 	If Not StringInStr($SafeHash, $Hash) Then
-		_ConsoleWrite("Hash error - " & $Hash)
+		_Log("Hash error - " & $Hash)
 		MsgBox(16, $Title, "Error starting program")
 		Exit
 	EndIf
@@ -693,22 +703,24 @@ Func _Restic($Command, $Opt = $RunSTDIO)
 	; Execute the restic command
 	Local $Run = $ResticFullPath & " " & $Command
 
-	_ConsoleWrite("  Command: " & $Run, 3)
+	_Log("  Command: " & $Run, 3)
 	_UpdateEnv($aConfig)
-	_ConsoleWrite("  Working Repository: " & EnvGet("RESTIC_REPOSITORY"), 1)
+	_Log("  Working Repository: " &	EnvGet("RESTIC_REPOSITORY"), 1)
 
-	_ConsoleWrite("  _RunWait", 2)
-	If $Opt = $STDIO_INHERIT_PARENT Then _ConsoleWrite("")
-	Local $Return = _RunWait($Run, @ScriptDir, @SW_HIDE, $Opt, True)
+	_Log("  _RunWait - $RunSTDIO=" & $RunSTDIO, 2)
+	Local $PID = _RunWait($Run, @ScriptDir, @SW_HIDE, $RunSTDIO, True, False)
+
 	_UpdateEnv($aConfig, True) ; Remove env values
+	_Log("")
 
-	Return $Return
+	Return $PID
 EndFunc   ;==>_Restic
 
 ; Do cleanup on script exit
 Func _Exit()
-	_ConsoleWrite("_Exit", 3)
+	_Log("_Exit", 3)
 
+	Global $SettingsForm
 	GUIDelete($SettingsForm)
 
 	; Close any instance of restic-browser
@@ -722,10 +734,10 @@ Func _Exit()
 		For $i = 1 To $aList[0]
 			$RemovePath = $sPath & $aList[$i]
 			DirRemove($RemovePath, 1)
-			_ConsoleWrite("DirRemove: " & @error & " (" & $aList[$i] & ")", 3)
+			_Log("DirRemove: @error=" & @error & " (" & $aList[$i] & ")", 3)
 		Next
 	EndIf
 
-	_ConsoleWrite("  Cleanup Done, Exiting Program")
+	_Log("  Cleanup Done, Exiting Program")
 EndFunc   ;==>_Exit
 
