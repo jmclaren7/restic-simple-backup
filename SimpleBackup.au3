@@ -43,9 +43,7 @@ Global $TitleVersion = $Title & " v" & StringTrimLeft($Version, StringInStr($Ver
 
 ; Setup Logging
 _Console_Attach() ; If it was launched from a console, attach to that console
-Global $LogToFile = 0
 Global $LogFileMaxSize = 512
-Global $LogWindowStart = 1
 Global $LogLevel = 1
 If @Compiled Then
 	$LogFullPath = StringTrimRight(@ScriptFullPath, 4) & ".log"
@@ -53,6 +51,7 @@ If @Compiled Then
 Else
 	$LogLevel = 3
 	Global $LogTitle = "Log - " & $Title
+	Global $LogWindowStart = 1
 EndIf
 
 _Log("Starting " & $TitleVersion)
