@@ -200,7 +200,7 @@ While 1
 			; Setup a custom menu
 			Global $MenuMsg = 0
 			If Not IsDeclared("ExitMenuItem") Then Global Enum $ExitMenuItem = 1000, $ScheduledTaskMenuItem, $FixConsoleMenuItem, $BrowserMenuItem, _
-					$VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem, $AboutMenuItem, $WebsiteMenuItem
+					$VerboseMenuItem, $TemplateMenuItem, $NewProfileMenuItem, $AboutMenuItem, $WebsiteMenuItem, $InstallMenuItem
 
 			; Setup file menu
 			$g_hFile = _GUICtrlMenu_CreateMenu()
@@ -227,6 +227,7 @@ While 1
 
 			; Setup tools menu
 			$g_hTools = _GUICtrlMenu_CreateMenu()
+			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Copy " & @ScriptName & " To Program Files And Restart Program", $InstallMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Create/Reset Scheduled Task (Profile: " & _GetProfileName() & ")", $ScheduledTaskMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Open Restic Browser", $BrowserMenuItem)
 			_GUICtrlMenu_InsertMenuItem($g_hTools, -1, "Add Missing Configuration Options From Template", $TemplateMenuItem)
@@ -387,6 +388,15 @@ While 1
 						; Load the Restic credential envs and start restic-browser.exe
 						_UpdateEnv($aConfig)
 						$ResticBrowserPid = Run($ResticBrowserFullPath)
+
+					; Copy the program to Program Files
+					Case $InstallMenuItem
+						If @Compiled Then
+							$sDestinationFullPath = @ProgramFilesDir & "\" & StringTrimRight(@ScriptName, 4) & "\" & @ScriptName
+							FileCopy(@ScriptFullPath, $sDestinationFullPath, $FC_CREATEPATH)
+							ShellExecute($sDestinationFullPath)
+							Exit
+						EndIf
 
 					; Create a sceduled task to run the backup
 					Case $ScheduledTaskMenuItem
