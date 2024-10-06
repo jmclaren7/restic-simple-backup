@@ -3,7 +3,7 @@
 #AutoIt3Wrapper_Icon=include\SimpleBackup.ico
 #AutoIt3Wrapper_Compression=4
 #AutoIt3Wrapper_UseX64=y
-#AutoIt3Wrapper_Change2CUI=n
+#AutoIt3Wrapper_Res_Comment=https://github.com/jmclaren7/restic-simple-backup
 #AutoIt3Wrapper_Res_Description=SimpleBackup
 #AutoIt3Wrapper_Res_Fileversion=1.0.0.273
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
