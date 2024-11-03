@@ -71,8 +71,8 @@ Global $RunSTDIO = $STDERR_MERGED
 
 ; These SHA1 hashes are used to verify the Restic and Restic-Browser binaries right before they run
 Global $SafeHash = _
-		"0x96440aef8599e107af6900c7db6726052368417c" & _ ; 7/28/24
-		"0x4a2720648afdec7872ece528381515b35ddda1d6" & _ ; 7/28/24
+		"0xfc731979ce12a857efd2f210f51dcd5d08f66d24" & _ ; 11/01/24
+		"0xc3cf4db47ffe72924bda7bc47231dda270b517a2" & _ ; 11/01/24
 		"0x87fb101fd68c3f1807a965276a6111cc8f7d1e75" & _ ; 10/5/24
 		"0x25c66afd8682507aacff9f90a2e2b96c5ed9d9a5" ; 10/5/24
 
