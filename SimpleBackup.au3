@@ -258,8 +258,19 @@ While 1
 			If $LogLevel = 3 Then _GUICtrlMenu_SetItemState($g_hMain, $VerboseMenuItem, $MFS_CHECKED, True, False)
 			GUIRegisterMsg($WM_COMMAND, "_WM_COMMAND")
 
+
+			; Setup GUI accelerators
+			Dim $aAccelKeys[2][2]
+
 			; CTRL+S will work as apply button
-			Dim $aAccelKeys[1][2] = [["^s", $ApplyButton]]
+			$aAccelKeys[0][0] = "^s"
+			$aAccelKeys[0][1] = $ApplyButton
+
+			; ENTER will run the command while combobox has focus
+			$cEnterPressed = GUICtrlCreateDummy()
+			$aAccelKeys[1][0] = "{ENTER}"
+			$aAccelKeys[1][1] = $cEnterPressed
+
 			GUISetAccelerators($aAccelKeys)
 
 			; GUI loop
@@ -420,7 +431,9 @@ While 1
 						EndIf
 
 					; Run the command provided from the combobox
-					Case $RunButton
+					Case $RunButton, $cEnterPressed
+						If $nMsg = $cEnterPressed And ControlGetFocus($SettingsForm) <> "Edit2" Then ContinueLoop
+
 						; Adjust window visibility and activation due to long running process
 						GUISetState(@SW_DISABLE, $SettingsForm)
 						WinSetTrans($SettingsForm, "", 210)
@@ -432,7 +445,11 @@ While 1
 						; Continue based on combobox value
 						$RunComboText = GUICtrlRead($RunCombo)
 						Switch $RunComboText
-							Case "custom/advanced commands can be added here in the future"
+							; Custom/advanced commands can be added here in the future
+							Case "cmd"
+								EnvSet("Path", EnvGet("Path") & ";" & $TempDir)
+								_Restic("stage env")
+								Run("cmd.exe")
 
 							Case "Test Email"
 								If _KeyValue($aConfig, "SMTP_Server") Then
@@ -717,13 +734,16 @@ Func _Restic($Command)
 	_UpdateEnv($aConfig)
 	_Log("  Working Repository: " &	EnvGet("RESTIC_REPOSITORY"), 1)
 
-	_Log("  _RunWait - $RunSTDIO=" & $RunSTDIO, 2)
-	Local $PID = _RunWait($Run, @ScriptDir, @SW_HIDE, $RunSTDIO, True, False)
+	If $Command <> "stage env" Then
+		_Log("  _RunWait - $RunSTDIO=" & $RunSTDIO, 2)
+		Local $PID = _RunWait($Run, @ScriptDir, @SW_HIDE, $RunSTDIO, True, False)
+		_UpdateEnv($aConfig, True) ; Remove env values
+		_Log("")
 
-	_UpdateEnv($aConfig, True) ; Remove env values
-	_Log("")
+		Return $PID
+	EndIf
 
-	Return $PID
+	Return ""
 EndFunc   ;==>_Restic
 
 ; Do cleanup on script exit
@@ -751,3 +771,6 @@ Func _Exit()
 	_Log("  Cleanup Done, Exiting Program")
 EndFunc   ;==>_Exit
 
+Func _IsGUIControlFocused($h_Wnd, $i_ControlID) ; Check if a control has focus.
+    Return ControlGetHandle($h_Wnd, '', $i_ControlID) = ControlGetHandle($h_Wnd, '', ControlGetFocus($h_Wnd))
+EndFunc   ;==>_OIG_IsFocused
