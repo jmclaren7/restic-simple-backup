@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=https://github.com/jmclaren7/restic-simple-backup
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.273
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.274
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -373,11 +373,13 @@ While 1
 					; Start the Restic-Browser
 					Case $BrowserMenuItem
 						; Pack and unpack the Restic-Browser executable
-						DirCreate($TempDir)
-						If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
-							_Log("FileInstall error")
-							MsgBox(16, $Title, "Error unpacking program")
-							Exit
+						If Not FileExists($ResticBrowserFullPath) Or IsDeclared("ResticBrowserPid") = 0 Then ; Allows a second instance to start without error
+							DirCreate($TempDir)
+							If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
+								_Log("FileInstall error")
+								MsgBox(16, $Title, "Error unpacking program")
+								Exit
+							EndIf
 						EndIf
 
 						; Run a dummy restic command to unpack the restic executable
