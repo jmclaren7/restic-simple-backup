@@ -124,7 +124,7 @@ _Log("Command: " & $Command)
 While 1
 	; Load config from file and load to array
 	$ConfigData = _ReadConfig()
-	If @error Then MsgBox(16, $Title, "Error opening configuration")
+	If @error = 1 Then MsgBox(16, $Title, "Error opening configuration")
 	Global $aConfig = _ConfigToArray($ConfigData)
 
 	; If config is empty load it with the template, otherwise make sure it at least has required settings
@@ -714,7 +714,13 @@ EndFunc   ;==>_ArrayToConfig
 ; Read and decrypt the config file
 Func _ReadConfig()
 	_Log("_ReadConfig", 3)
-	Global $Key
+	Global $Key, $ActiveConfigFileFullPath
+
+	If Not FileExists($ActiveConfigFileFullPath) Then
+		_Log("Selected config file doesn't exist")
+		Return SetError(2, 0)
+	EndIf
+
 	Local $ConfigData = FileRead($ActiveConfigFileFullPath)
 
 	; Decypt Data
