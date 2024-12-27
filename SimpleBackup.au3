@@ -61,9 +61,10 @@ Global $TempDir = _TempFile(@TempDir, "sbr", "tmp", 10)
 Global $ResticFullPath = $TempDir & "\restic.exe"
 Global $ResticBrowserFullPath = $TempDir & "\Restic-Browser.exe"
 Global $SMTPSettings = "Backup_Name|SMTP_Server|SMTP_UserName|SMTP_Password|SMTP_FromAddress|SMTP_FromName|SMTP_ToAddress|SMTP_SendOnFailure|SMTP_SendOnSuccess"
+Global $WebhookSettings = "WebhookURL_Success|WebhookURL_Failure"
 Global $InternalSettings = "Setup_Password|Backup_Path|Backup_Prune|" & $SMTPSettings
 Global $RequiredSettings = "Setup_Password|Backup_Path|Backup_Prune|RESTIC_REPOSITORY|RESTIC_PASSWORD"
-Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings
+Global $SettingsTemplate = $RequiredSettings & "|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|RESTIC_READ_CONCURRENCY=4|RESTIC_PACK_SIZE=32|" & $SMTPSettings & "|" & $WebhookSettings
 Global $ActiveConfigFileFullPath = _GetProfileFullPath()
 
 ; $RunSTDIO will determine how we execute restic, default $STDERR_MERGED will allow restic output to be logged to file
@@ -163,7 +164,18 @@ While 1
 
 			EndIf
 
-			_Restic("forget --prune " & _KeyValue($aConfig, "Backup_Prune"))
+			; Trigger webhook based on success or failure
+			If Not $BackupSuccess And _KeyValue($aConfig, "WebhookURL_Failure") Then
+				_Log("Failure Inet: " & BinaryToString(InetRead(_KeyValue($aConfig, "WebhookURL_Failure"), 1)))
+
+			EndIf
+
+			If $BackupSuccess And _KeyValue($aConfig, "WebhookURL_Success") Then
+				_Log("Success Inet: " & BinaryToString(InetRead(_KeyValue($aConfig, "WebhookURL_Success"), 1)))
+			EndIf
+
+			$Prune = _KeyValue($aConfig, "Backup_Prune")
+			If $Prune Then _Restic("forget --prune " & $Prune)
 
 		; Setup GUI
 		Case "setup"
