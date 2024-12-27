@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=https://github.com/jmclaren7/restic-simple-backup
 #AutoIt3Wrapper_Res_Description=SimpleBackup
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.274
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.280
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=y
 #AutoIt3Wrapper_Res_ProductVersion=1
 #AutoIt3Wrapper_Res_LegalCopyright=SimpleBackup
@@ -79,11 +79,24 @@ Global $SafeHash = _
 		"0x87fb101fd68c3f1807a965276a6111cc8f7d1e75" & _ ; 10/5/24
 		"0x25c66afd8682507aacff9f90a2e2b96c5ed9d9a5" ; 10/5/24
 
-; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing the key for your own deployment could help though
-Global $HwKey = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
-
 ; Register our exit function for cleanup
 OnAutoItExitRegister("_Exit")
+
+; This key is used to encrypt the configuration file but is mostly just going to limit non-targeted/low-effort attacks, customizing the key for your own deployment could help though
+Global $Key
+$Key = RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\RSB", "k")
+If @error Or $Key = "" Then
+	$Key = _WinAPI_UniqueHardwareID($UHID_MB) & DriveGetSerial(@HomeDrive & "\") & @CPUArch
+	RegWrite("HKEY_LOCAL_MACHINE\SOFTWARE\RSB", "k", "REG_SZ", $Key)
+	If @error Then
+		_Log("Error saving key")
+	Else
+		_Log("Saved key")
+	EndIf
+Else
+	_Log("Key loaded from registry", 2)
+
+EndIf
 
 ; Interpret command line parameters
 $Command = Default
@@ -110,7 +123,9 @@ _Log("Command: " & $Command)
 ; This loop is used to effectively restart the program for when we switch profiles
 While 1
 	; Load config from file and load to array
-	Global $aConfig = _ConfigToArray(_ReadConfig())
+	$ConfigData = _ReadConfig()
+	If @error Then MsgBox(16, $Title, "Error opening configuration")
+	Global $aConfig = _ConfigToArray($ConfigData)
 
 	; If config is empty load it with the template, otherwise make sure it at least has required settings
 	If UBound($aConfig) = 0 Then
@@ -649,23 +664,23 @@ EndFunc   ;==>_ForceRequiredConfig
 Func _ConfigToArray($ConfigData)
 	_Log("_ConfigToArray", 3)
 
-	$aConfigLines = StringSplit($ConfigData, @CRLF, 1)
-	Local $aArray[]
+	Local $aConfigLines = StringSplit($ConfigData, @CRLF, 1)
+	Local $ThisKey, $KeyValue, $aArray[]
 
 	; Loop through each line
 	For $i = 1 To $aConfigLines[0]
 		; Prefix comments with #<UID>= so that we can treat them as a key=value pair, each with a unique key
 		If StringLeft($aConfigLines[$i], 1) = "#" Then $aConfigLines[$i] = "#" & $i & "=" & $aConfigLines[$i]
 
-		$Key = StringLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "=") - 1)
-		$Key = StringStripWS($Key, 1 + 2)
+		$ThisKey = StringLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "=") - 1)
+		$ThisKey = StringStripWS($ThisKey, 1 + 2)
 
-		If $Key = "" Then ContinueLoop
+		If $ThisKey = "" Then ContinueLoop
 
 		$KeyValue = StringTrimLeft($aConfigLines[$i], StringInStr($aConfigLines[$i], "="))
 		$KeyValue = StringStripWS($KeyValue, 1 + 2)
 
-		_KeyValue($aArray, $Key, $KeyValue)
+		_KeyValue($aArray, $ThisKey, $KeyValue)
 	Next
 
 
@@ -675,10 +690,9 @@ EndFunc   ;==>_ConfigToArray
 ; Converts array back to a string of key=value pairs and fix comments
 Func _ArrayToConfig($aArray)
 	_Log("_ArrayToConfig", 3)
+	Local $ConfigData, $Add
 
 	If UBound($aArray, 0) <> 2 Then Return SetError(1, 0, "")
-
-	Local $ConfigData, $Add
 
 	; Loop array and combine key=value pairs
 	For $i = 1 To $aArray[0][0]
@@ -700,11 +714,18 @@ EndFunc   ;==>_ArrayToConfig
 ; Read and decrypt the config file
 Func _ReadConfig()
 	_Log("_ReadConfig", 3)
-
+	Global $Key
 	Local $ConfigData = FileRead($ActiveConfigFileFullPath)
 
-	; Decypt Data Here
-	$ConfigData = BinaryToString(_Crypt_DecryptData($ConfigData, $HwKey, $CALG_AES_256))
+	; Decypt Data
+	$ConfigData = _Crypt_DecryptData($ConfigData, $Key, $CALG_AES_256)
+	If @error OR $ConfigData = "" Then
+		_Log("Could not decrypt configuration file")
+		_Log("Key: " & $Key, 2)
+		Return SetError(1, 0, $ConfigData)
+	EndIf
+
+	$ConfigData = BinaryToString($ConfigData)
 
 	Return $ConfigData
 EndFunc   ;==>_ReadConfig
@@ -712,9 +733,10 @@ EndFunc   ;==>_ReadConfig
 ; Encrypt and write the config file
 Func _WriteConfig($ConfigData)
 	_Log("_WriteConfig", 3)
+	Global $Key
 
 	; Encrypt
-	$ConfigData = _Crypt_EncryptData($ConfigData, $HwKey, $CALG_AES_256)
+	$ConfigData = _Crypt_EncryptData($ConfigData, $Key, $CALG_AES_256)
 
 	$hConfigFile = FileOpen($ActiveConfigFileFullPath, 2)
 	FileWrite($hConfigFile, $ConfigData)
