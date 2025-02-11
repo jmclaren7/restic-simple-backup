@@ -7,13 +7,10 @@
 #include <Array.au3>
 #include <AutoItConstants.au3>
 #include <Date.au3>
-#include <EditConstants.au3>
 #include <File.au3>
 #include <GUIConstantsEx.au3>
 #include <GuiEdit.au3>
 #include <GuiListBox.au3>
-#include <APIFilesConstants.au3>
-#include <Security.au3>
 #include <String.au3>
 #include <WinAPIFiles.au3>
 #include <WinAPIProc.au3>
@@ -21,6 +18,24 @@
 #include <WinAPISysWin.au3>
 #include <WindowsConstants.au3>
 ;===============================================================================
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _Error
+; Description ...: Call _log and MsgBox in one command
+; Syntax ........: _Error($Message[, $iLevel = Default[, $MessageEx = ""]])
+; Parameters ....: $Title               - Window title
+;                  $Message             - Message for MsgBox and _Log.
+;                  $iLevel              - [optional]
+;                  $MessageEx           - [optional] an extra message that will only show in the log.
+; Return values .: MsgBox return value
+; Author ........: JohnMC - JohnsCS.com
+; Modified ......:
+; ===============================================================================================================================
+Func _Error($Title, $Message, $iLevel = Default, $MessageEx = "")
+	If $MessageEx <> "" Then $MessageEx = " - " & $MessageEx
+	_Log($Message & $MessageEx, $iLevel)
+	Return MsgBox(16, $Title, $Message)
+EndFunc
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _RandomString
@@ -120,7 +135,6 @@ EndFunc   ;==>_Timer
 ; Author ........: JohnMC - JohnsCS.com, based on AdamUL's _GetVisibleWindows
 ; Modified ......: 03/29/2024  --  v2.1
 ; ===============================================================================================================================
-;_ArrayDisplay(_GetVisibleWindows(), @extended)
 Func _GetVisibleWindows($GetText = False)
 	Local $NewCol, $TotalTime, $Timer
 
@@ -825,8 +839,11 @@ EndFunc   ;==>_FileInUseWait
 ; Author(s):        JohnMC - JohnsCS.com
 ; Date/Version:		01/16/2016  --  v1.1
 ;===============================================================================
-Func _RunWait($sProgram, $Working = "", $Show = @SW_HIDE, $Opt = $STDERR_MERGED, $Live = False, $Diag = False)
+Func _RunWait($sProgram, $Working = "", $Show = Default, $Opt = Default, $Live = False, $Diag = False)
 	Local $sData, $iPid
+
+	If $Show = Default Then $Show = @SW_HIDE
+	If $Opt = Default Then $Opt = $STDERR_MERGED
 
 	$iPid = Run($sProgram, $Working, $Show, $Opt)
 	If @error Then
@@ -849,8 +866,11 @@ EndFunc   ;==>_RunWait
 ; Author(s):        JohnMC - JohnsCS.com
 ; Date/Version:		09/8/2023  --  v1.3
 ;===============================================================================
-Func _ProcessWaitClose($iPid, $Live = False, $Diag = False)
+Func _ProcessWaitClose($iPid, $Live = Default, $Diag = Default)
 	Local $sData, $sStdRead
+
+	If $Live = Default Then $Live = False
+	If $Diag = Default Then $Diag = False
 
 	While 1
 		$sStdRead = StdoutRead($iPid)
@@ -1068,6 +1088,9 @@ Func _Log($sMessage, $iLevel = Default, $bOverWriteLast = Default, $iCallingLine
 	If $iLevel > $LogLevel Then Return ""
 
 	; Send to console
+	; _Console_Write is from Console.au3
+	#ignorefunc _Console_Write
+
 	If $bOverWriteLast And Not @Compiled Then
 		; Do Nothing
 	ElseIf $bOverWriteLast Then
