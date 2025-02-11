@@ -296,7 +296,7 @@ While 1
 
 			; ENTER will run the command while combobox has focus
 			$cEnterPressed = GUICtrlCreateDummy()
-			$aAccelKeys[1][0] = "{ENTER}"
+			$aAccelKeys[1][0] = "^-" ; Set to something that wont be needed, until the combo box is in focus
 			$aAccelKeys[1][1] = $cEnterPressed
 
 			GUISetAccelerators($aAccelKeys)
@@ -536,7 +536,19 @@ While 1
 					_GUICtrlComboBox_SetEditText($RunCombo, $NewText)
 				EndIf
 
-				Sleep(10)
+				; If RunCombo is active set accelerator for {enter}
+				$FocusControl = ControlGetFocus($SettingsForm)
+				If $aAccelKeys[1][0] <> "{ENTER}" And $FocusControl = "Edit2" Then
+					$aAccelKeys[1][0] = "{ENTER}"
+					GUISetAccelerators($aAccelKeys)
+					_Log("Run Accelerator Set", 3)
+				Elseif $aAccelKeys[1][0] = "{ENTER}" And $FocusControl <> "Edit2" Then
+					$aAccelKeys[1][0] = "^-"
+					GUISetAccelerators($aAccelKeys)
+					_Log("Run Accelerator Unset", 3)
+				EndIf
+
+				Sleep(20)
 			WEnd
 
 		Case Else
