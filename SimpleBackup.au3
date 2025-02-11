@@ -375,7 +375,7 @@ While 1
 						MsgBox($MB_ICONINFORMATION, $TitleVersion, _
 								"Restic SimpleBackup" & @CRLF & "https://github.com/jmclaren7/restic-simple-backup" & @CRLF & "Copyright (c) 2023, John McLaren" & @CRLF & @CRLF & _
 								"Restic" & @CRLF & "https://github.com/restic/restic" & @CRLF & "Copyright (c) 2014, Alexander Neumann" & @CRLF & @CRLF & _
-								"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022 Eduard Müller / taktik", 0, $SettingsForm)
+								"Restic Browser" & @CRLF & "https://github.com/emuell/restic-browser" & @CRLF & "Copyright (c) 2022, Eduard Müller / taktik", 0, $SettingsForm)
 
 					; Create or switch profile
 					Case $NewProfileMenuItem, 1100 To 1199
@@ -399,12 +399,25 @@ While 1
 
 					; Start the Restic-Browser
 					Case $BrowserMenuItem
-						; Pack and unpack the Restic-Browser executable
-						If Not FileExists($ResticBrowserFullPath) Or IsDeclared("ResticBrowserPid") = 0 Then ; Allows a second instance to start without error
+						; Install Restic-Browser.exe
+						; If the executable exists, verify it
+						If FileExists($ResticBrowserFullPath) Then
+							Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
+							If Not StringInStr($SafeHash, $Hash) Then
+								_Error("Error starting Restic-Browser.exe, the program will now exit", Default, "Hash error - " & $Hash)
+								Exit
+							EndIf
+						Else
+							; Pack and unpack the executable
 							DirCreate($TempDir)
 							If FileInstall("include\Restic-Browser.exe", $ResticBrowserFullPath, 1) = 0 Then
-								_Log("FileInstall error")
-								MsgBox(16, $Title, "Error unpacking program")
+								_Error("Error starting Restic-Browser.exe, the program will now exit", Default, "FileInstall error - " & @error)
+								Exit
+							EndIf
+							; Verify the hash of the executable
+							Local $Hash = _Crypt_HashFile($ResticBrowserFullPath, $CALG_SHA1)
+							If Not StringInStr($SafeHash, $Hash) Then
+								_Error("Error starting Restic-Browser.exe, the program will now exit", Default, "Hash error - " & $Hash)
 								Exit
 							EndIf
 						EndIf
@@ -755,19 +768,27 @@ Func _Restic($Command)
 
 	Global $RunSTDIO, $TempDir, $ResticFullPath
 
-	; Pack and unpack the Restic executable
-	DirCreate($TempDir)
-	If FileInstall("include\restic.exe", $ResticFullPath, 1) = 0 Then
-		_Log("FileInstall error")
-		Exit
-	EndIf
-
-	; Verify the hash of the Restic executable
-	Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
-	If Not StringInStr($SafeHash, $Hash) Then
-		_Log("Hash error - " & $Hash)
-		MsgBox(16, $Title, "Error starting program")
-		Exit
+	; Install restic.exe
+	; If the executable exists, verify it
+	If FileExists($ResticFullPath) Then
+		Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
+		If Not StringInStr($SafeHash, $Hash) Then
+			_Error("Error starting restic.exe", Default, "Hash error - " & $Hash)
+			Exit
+		EndIf
+	Else
+		; Pack/unpack the executable
+		DirCreate($TempDir)
+		If FileInstall("include\restic.exe", $ResticFullPath, 1) = 0 Then
+			_Error("Error starting restic.exe", Default, "FileInstall error - " & @error)
+			Exit
+		EndIf
+		; Verify the hash of the executable
+		Local $Hash = _Crypt_HashFile($ResticFullPath, $CALG_SHA1)
+		If Not StringInStr($SafeHash, $Hash) Then
+			_Error("Error starting restic.exe", Default, "Hash error - " & $Hash)
+			Exit
+		EndIf
 	EndIf
 
 	; Execute the restic command
