@@ -301,6 +301,12 @@ While 1
 
 			GUISetAccelerators($aAccelKeys)
 
+			; Get the handle of the ComboBox's edit control
+			$tInfo = $tagCOMBOBOXINFO
+			_GUICtrlComboBox_GetComboBoxInfo($RunCombo, $tInfo)
+			Const $RunComboEditHandle = DllStructGetData($tInfo, "hEdit")
+
+
 			; GUI loop
 			While 1
 				$nMsg = GUIGetMsg()
@@ -537,12 +543,12 @@ While 1
 				EndIf
 
 				; If RunCombo is active set accelerator for {enter}
-				$FocusControl = ControlGetFocus($SettingsForm)
-				If $aAccelKeys[1][0] <> "{ENTER}" And $FocusControl = "Edit2" Then
+				$FocusHandle = ControlGetHandle($SettingsForm, "", ControlGetFocus($SettingsForm, ""))
+				If $aAccelKeys[1][0] <> "{ENTER}" And $FocusHandle = $RunComboEditHandle Then
 					$aAccelKeys[1][0] = "{ENTER}"
 					GUISetAccelerators($aAccelKeys)
 					_Log("Run Accelerator Set", 3)
-				Elseif $aAccelKeys[1][0] = "{ENTER}" And $FocusControl <> "Edit2" Then
+				Elseif $aAccelKeys[1][0] = "{ENTER}" And $FocusHandle <> $RunComboEditHandle Then
 					$aAccelKeys[1][0] = "^-"
 					GUISetAccelerators($aAccelKeys)
 					_Log("Run Accelerator Unset", 3)
@@ -558,6 +564,7 @@ While 1
 
 	Exit ; To support existing program flow since adding loop used to restart GUI
 WEnd
+
 
 ;=====================================================================================
 ;=====================================================================================
@@ -846,7 +853,3 @@ Func _Exit()
 
 	_Log("  Cleanup Done, Exiting Program")
 EndFunc   ;==>_Exit
-
-Func _IsGUIControlFocused($h_Wnd, $i_ControlID) ; Check if a control has focus.
-    Return ControlGetHandle($h_Wnd, '', $i_ControlID) = ControlGetHandle($h_Wnd, '', ControlGetFocus($h_Wnd))
-EndFunc   ;==>_OIG_IsFocused
