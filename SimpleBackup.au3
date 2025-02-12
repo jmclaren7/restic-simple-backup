@@ -304,7 +304,7 @@ While 1
 			; Get the handle of the ComboBox's edit control
 			$tInfo = $tagCOMBOBOXINFO
 			_GUICtrlComboBox_GetComboBoxInfo($RunCombo, $tInfo)
-			Const $RunComboEditHandle = DllStructGetData($tInfo, "hEdit")
+			$RunComboEditHandle = DllStructGetData($tInfo, "hEdit")
 
 
 			; GUI loop
